@@ -71,7 +71,7 @@ fail2ban's own log (`/var/log/fail2ban.log`) shows what it found, banned and unb
 
 <p align="center"><img src="assets/fwscope-pull-badge.webp" alt="fwscope-pull: logs from servers, routers and clouds flowing into one folder" width="220"></p>
 
-[`scripts/fwscope-pull.py`](scripts/fwscope-pull.py) gathers logs onto the computer you run fwscope on, so you don't have to remember where each system keeps them. It's one Python 3.9+ file with no dependencies, and it works on Windows, macOS and Linux. Remote machines are reached over SSH with the `ssh` client your system already has (Windows 10 and later include it), so nothing gets installed on your servers or routers and they don't need Python.
+[`scripts/fwscope-pull.py`](scripts/fwscope-pull.py) gathers logs onto the computer you run fwscope on, so you don't have to remember where each system keeps them. It's one Python 3.10+ file with no dependencies, and it works on Windows, macOS and Linux. Remote machines are reached over SSH with the `ssh` client your system already has (Windows 10 and later include it), so nothing gets installed on your servers or routers and they don't need Python.
 
 | Command | What it pulls |
 |---|---|
@@ -94,6 +94,11 @@ python3 fwscope-pull.py gui
 ```
 
 It opens a page in your browser with a tab for each source. Fill in the host (or zone, bucket, storage account), press **Pull logs**, watch its output, then press **Open in fwscope**: fwscope opens with the logs already loaded, no folder to drag. Stop it with Ctrl+C in its terminal, or **quit it here** on the page.
+
+<p align="center">
+  <img src="assets/pull-gui-form.webp" alt="The fwscope-pull helper page: tabs for Linux server, OPNsense / pfSense, OpenWrt, This computer, Cloudflare, AWS VPC and Azure, with the Linux server form filled in (SSH login, port, key file, sudo, days back)" width="49%">
+  <img src="assets/pull-gui-done.webp" alt="After a pull: six files ready, the output listing each file fetched with its size and the folder they went to, and the Open in fwscope button" width="49%">
+</p>
 
 - It listens on this computer only (`127.0.0.1`, port 8765 by default; `--port` to change it). The address it opens carries a random key that becomes a cookie, every request needs it, and requests for any other host name are refused, so no website you visit can drive it.
 - Each pull runs the same command line as above, with the form's values checked field by field. Passwords and tokens go to that one run through its environment, and aren't saved (the other fields are remembered in the browser for next time).

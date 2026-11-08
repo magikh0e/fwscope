@@ -475,6 +475,7 @@ GUI_PAGE = r'''<!doctype html>
 <style>
 :root { --page:#f9f9f7; --surface:#fcfcfb; --surface-2:#f0efec; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781; --ring:rgba(11,11,11,.12); --accent:#2a78d6; --bad:#c43c6b; --good:#0a7d32; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
 @media (prefers-color-scheme: dark) { :root { --page:#121212; --surface:#1b1b1b; --surface-2:#262626; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781; --ring:rgba(255,255,255,.12); --bad:#e87ba4; --good:#3ec26b; } }
+:root { color-scheme: light dark; }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.5 system-ui, sans-serif; }
 .wrap { max-width: 860px; margin: 0 auto; padding: 16px; }
@@ -489,6 +490,7 @@ button:hover { background: var(--surface-2); } button:disabled { opacity: .5; cu
 label { display: block; margin: 8px 0 2px; color: var(--ink-2); font-size: 13px; }
 input[type=text], input[type=password], input[type=number], input[type=date], select { width: 100%; max-width: 420px; padding: 6px 8px; border: 1px solid var(--ring); border-radius: 6px; background: var(--page); }
 label.check { display: flex; gap: 8px; align-items: center; color: var(--ink); }
+label:not(.check) > input, label > select { display: block; margin-top: 3px; }
 .hint { color: var(--muted); font-size: 12.5px; margin: 6px 0 0; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
 pre { background: var(--surface-2); border-radius: 6px; padding: 10px; font: 12.5px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; margin: 8px 0 0; }
