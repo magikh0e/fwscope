@@ -130,7 +130,7 @@ a.ext { color: var(--muted); text-decoration: none; margin-left: 4px; }
 a.ext:hover { color: var(--accent); }
 
 /* heatmap */
-.hm { display: grid; grid-template-columns: 34px repeat(24, 1fr); gap: 2px; font-size: 11px; color: var(--muted); }
+.hm { display: grid; grid-template-columns: 30px repeat(24, minmax(0, 1fr)); gap: 2px; font-size: 11px; color: var(--muted); }
 .hm div { aspect-ratio: 1.3; border-radius: 3px; }
 .hm .lab { aspect-ratio: auto; display: flex; align-items: center; }
 .hm .hr { aspect-ratio: auto; text-align: center; font-variant-numeric: tabular-nums; }
@@ -157,6 +157,20 @@ tr.clk:hover td { background: var(--surface-2); }
 #tip .r b { font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
 #tip .r em { width: 12px; height: 2px; display: inline-block; }
 #tip .r span { color: var(--ink-2); }
+
+/* new in window */
+.newgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 22px; }
+@media (max-width: 960px) { .newgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .newgrid { grid-template-columns: minmax(0, 1fr); } }
+.newgrid h3 { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 0 0 6px; }
+.newgrid h3 b { color: var(--ink); font-size: 15px; margin-left: 4px; }
+.newrow { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; padding: 2px 0; cursor: pointer; }
+.newrow:hover .nl { color: var(--accent); }
+.newrow .nl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+.newrow .nl small { font-family: system-ui, sans-serif; color: var(--muted); }
+.newrow .nc { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.newgrid .none { color: var(--muted); font-size: 12px; }
+.newnote { background: var(--surface-2); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
 
 /* map */
 .geo-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 18px; }
@@ -206,6 +220,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <p>Plain <code>ufw.log</code>, rotated <code>.gz</code> files, <code>kern.log</code>/<code>syslog</code>, <code>dmesg -T</code> or <code>journalctl</code> output (text or <code>-o json</code>).</p>
       <p>Drop several at once to merge them. Duplicates across files are skipped (UFW writes the same line to ufw.log, kern.log and syslog).</p>
       <p>For a world map and network owners, drop a GeoIP database too (<code>.mmdb</code> or <code>.mmdb.gz</code>). <span id="geoStatusEmpty"></span></p>
+      <p>OPNsense / pfSense: drop a config backup (<code>config-*.xml</code>) and/or <code>rule_ids.json</code> to show interface and rule names. <span id="namesStatusEmpty"></span></p>
       <p style="color:var(--muted)">Everything is parsed in this browser tab. Nothing is uploaded anywhere.</p>
     </div>
     <div class="howto">
@@ -309,6 +324,15 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         </div>
       </div>
       <div class="geo-attr" id="geoAttr"></div>
+    </div>
+
+    <div class="card" id="newCard">
+      <div class="card-head"><h2>New in the last</h2>
+        <div class="seg" id="newWin"><button data-w="1h">hour</button><button data-w="24h" class="on">24 hours</button><button data-w="7d">7 days</button></div>
+        <span class="sub" id="newSub"></span></div>
+      <div class="newnote" id="newNote" hidden></div>
+      <div class="newgrid" id="newGrid"></div>
+      <div class="hint">First seen in that window and never earlier in the loaded logs, within the current filter (try <code>dpt:22</code> for new SSH sources). Click to filter. Shift-click to exclude.</div>
     </div>
 
     <div class="grid2">
@@ -532,7 +556,10 @@ function geoStatus() {
 // countries and documentation ASNs (RFC 5398: AS64496-64511) so the map has something to show.
 const DEMO_CC = [['CN', 14], ['US', 12], ['RU', 8], ['NL', 7], ['DE', 6], ['SG', 6], ['IN', 5], ['BR', 5], ['VN', 4], ['KR', 4], ['GB', 3], ['FR', 3], ['HK', 3], ['TW', 2], ['ID', 2], ['IR', 2], ['UA', 2], ['JP', 2], ['CA', 2], ['BG', 1], ['RO', 1], ['TR', 1], ['AR', 1], ['MX', 1], ['ZA', 1], ['TH', 1], ['PL', 1], ['SE', 1], ['AU', 1], ['EG', 1]];
 const DEMO_ORG = ['Example Hosting Ltd', 'Example Cloud B.V.', 'Example Telecom', 'Example Broadband', 'Example VPS LLC', 'Example Mobile', 'Example Datacenter GmbH', 'Example Networks'];
+// a newcomer that only appears in the sample's last day, so the "New" card has a network and country to show
+const DEMO_NEWCOMER = '2001:db8:beef:5::50';
 function demoGeo(ip) {
+  if (ip === DEMO_NEWCOMER) return { cc: 'IS', asn: 65530, org: 'Example Newcomer Hosting' };
   if (!/^(192\.0\.2\.|198\.51\.100\.|203\.0\.113\.|2001:db8:)/i.test(ip)) return {};
   const h = hash(ip), tot = DEMO_CC.reduce((s, x) => s + x[1], 0);
   let r = h % tot, cc = 'US';
@@ -1056,14 +1083,14 @@ function compileQuery(q) {
 }
 
 /* ============================================================ filter state */
-const F = { preset: 'all', range: null, acts: [true, true, true, true], q: '', preds: [], hideNoise: false, publicOnly: false, page: 0, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn' };
+const F = { preset: 'all', range: null, acts: [true, true, true, true], q: '', preds: [], hideNoise: false, publicOnly: false, page: 0, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h' };
 let SEL = new Uint32Array(0);
 
 /* ============================================================ view state: kept in the page address and the browser
    #q=dpt:22&t=7d&a=1101&n=1&p=1&d=src,dpt,asn&o=1   (t is a preset or "from-to" in epoch ms)
    The address makes a view bookmarkable; local storage brings it back on the next visit.
    A zoomed time range is only kept in the address: it rarely fits the next set of logs. */
-const VIEW_DEFAULT = { preset: 'all', range: null, acts: [true, true, true, true], q: '', hideNoise: false, publicOnly: false, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn' };
+const VIEW_DEFAULT = { preset: 'all', range: null, acts: [true, true, true, true], q: '', hideNoise: false, publicOnly: false, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h' };
 function viewString(withRange) {
   const p = new URLSearchParams();
   if (F.q.trim()) p.set('q', F.q.trim());
@@ -1074,6 +1101,7 @@ function viewString(withRange) {
   if (F.oldestFirst) p.set('o', '1');
   const dims = [F.dimA, F.dimB, F.dimC].join(',');
   if (dims !== 'src,dpt,asn') p.set('d', dims);
+  if (F.newWin !== '24h') p.set('w', F.newWin);
   return p.toString();
 }
 function readView(str) {
@@ -1083,12 +1111,14 @@ function readView(str) {
   const r = /^(\d{10,})-(\d{10,})$/.exec(t);
   if (r) v.range = [+r[1], +r[2]]; else if (['1h', '24h', '7d', '30d'].includes(t)) v.preset = t;
   if (/^[01]{4}$/.test(p.get('a') || '')) v.acts = [...p.get('a')].map(x => x === '1');
+  if (NEW_WIN_KEYS.includes(p.get('w'))) v.newWin = p.get('w');
   v.hideNoise = p.get('n') === '1'; v.publicOnly = p.get('p') === '1'; v.oldestFirst = p.get('o') === '1';
   const d = (p.get('d') || '').split(',');
   ['dimA', 'dimB', 'dimC'].forEach((k, i) => { if (d[i] && DIM_KEYS.includes(d[i])) v[k] = d[i]; });
   return v;
 }
 // dimension keys, known before DIMS is defined further down
+const NEW_WIN_KEYS = ['1h', '24h', '7d'];
 const DIM_KEYS = ['src', 'src24', 'cc', 'asn', 'dst', 'dpt', 'spt', 'proto', 'iin', 'iout', 'icmp', 'mac', 'host', 'rule', 'act'];
 function setView(v) {
   Object.assign(F, v, { page: 0 });
@@ -1121,9 +1151,17 @@ function timeWindow() {
   const span = { '1h': 36e5, '24h': 864e5, '7d': 6048e5, '30d': 2592e6 }[F.preset];
   return span ? [D.maxTs - span, D.maxTs + 1] : null;
 }
+// NEWBASE: the same filter without the time window, so "new" can look back through all history
+let NEWBASE = SEL;
 function apply() {
-  const c = D.c, n = D.n, order = D.order, G = D.actGroup, ipc = D.ipc;
   const win = timeWindow();
+  SEL = filterRows(win);
+  NEWBASE = win ? filterRows(null) : SEL;
+  renderAll();
+  saveView();
+}
+function filterRows(win) {
+  const c = D.c, n = D.n, order = D.order, G = D.actGroup, ipc = D.ipc;
   const lo = win ? win[0] : 0, hi = win ? win[1] : 0;
   const preds = F.preds, np = preds.length;
   const acts = F.acts;
@@ -1139,9 +1177,7 @@ function apply() {
     for (let p = 0; p < np; p++) if (!preds[p](i)) continue outer;
     out[m++] = i;
   }
-  SEL = out.subarray(0, m);
-  renderAll();
-  saveView();
+  return out.subarray(0, m);
 }
 
 /* ============================================================ UI: filter bar */
@@ -1227,7 +1263,7 @@ const groupRows = (counts, total) => {
 /* ============================================================ render: tiles */
 function renderAll() {
   hideTip(); syncPresets();
-  namesStatus(); renderTiles(); renderTimeline(); renderMap(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
+  namesStatus(); renderTiles(); renderTimeline(); renderMap(); renderNew(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
   const f = D.files.map(f => `${f.name} (${fmtN(f.events)}${f.partial ? ', stopped partway' : ''})`).join(', ');
   $('#foot').textContent = `${fmtN(D.n)} events from ${D.files.length} source${D.files.length > 1 ? 's' : ''}: ${f}.` +
     (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') +
@@ -1457,6 +1493,7 @@ async function loadNamesFile(file) {
 }
 function namesStatus() {
   const box = $('#namesStatus'); box.textContent = '';
+  $('#namesStatusEmpty').textContent = NAMES.sources.length ? `Loaded: names for ${fmtN(Object.keys(NAMES.ifaces).length)} interfaces and ${fmtN(Object.keys(NAMES.rules).length)} rules.` : '';
   if (!NAMES.sources.length) return;
   box.append(`Rule and interface names from ${NAMES.sources.map(s => `${s.name} (${fmtN(s.rules)} rules, ${fmtN(s.ifaces)} interfaces)`).join(', ')}. `);
   const b = el('button', null, 'Forget names');
@@ -1598,6 +1635,65 @@ function renderMap() {
   $('#geoSub').textContent = `${fmtN(shown)} events from ${countries} countries` + (unloc ? `; ${fmtN(unloc)} from private or unlocated sources not shown` : '') + (D.geoDemoUsed ? '. Sample data: locations are made up.' : '');
   renderRank('C');
 }
+
+/* ============================================================ render: new in the last hour / day / week */
+const NEW_WIN = { '1h': 36e5, '24h': 864e5, '7d': 6048e5 };
+const NEW_SHOW = 8;
+function renderNew() {
+  for (const b of $('#newWin').children) b.classList.toggle('on', b.dataset.w === F.newWin);
+  const grid = $('#newGrid'), note = $('#newNote'); grid.textContent = '';
+  const c = D.c, base = NEWBASE, wl = NEW_WIN[F.newWin], end = D.maxTs + 1, start = end - wl;
+  // per-entity first-seen time (base is in time order, so the first hit is the earliest) and events inside the window
+  const track = (size) => ({ first: new Float64Array(size).fill(Infinity), n: new Uint32Array(size) });
+  const S = track(D.ip.list.length), P = track(65536), A = D.geo ? track(D.asn.list.length) : null, C = D.geo ? track(D.cc.list.length) : null;
+  const hit = (T, k, t) => { if (T.first[k] === Infinity) T.first[k] = t; if (t >= start) T.n[k]++; };
+  let firstTs = NaN, inWin = 0;
+  for (let k = 0; k < base.length; k++) {
+    const i = base[k], t = c.ts[i];
+    if (t !== t) continue;
+    if (firstTs !== firstTs) firstTs = t;
+    if (t >= start) inWin++;
+    const s = c.src[i];
+    if (s) hit(S, s, t);
+    if (c.dpt[i] >= 0) hit(P, c.dpt[i], t);
+    if (A && D.ipAS[s] >= 0) hit(A, D.ipAS[s], t);
+    if (C && D.ipCC[s] >= 0) hit(C, D.ipCC[s], t);
+  }
+  const fresh = T => { const out = []; for (let k = 0; k < T.n.length; k++) if (T.n[k] && T.first[k] >= start) out.push(k); return out.sort((a, b) => T.n[b] - T.n[a] || a - b); };
+  const cols = [
+    { title: 'Sources', T: S, name: k => D.ip.list[k], tok: k => 'src:' + D.ip.list[k], sub: k => D.geo && D.ipCC[k] >= 0 ? D.cc.list[D.ipCC[k]] : '' },
+    { title: 'Networks', T: A, need: 'needs an ASN database', name: k => asnLabel(k), tok: k => 'asn:' + D.asnNum[k], sub: k => D.asnOrg[k] ? D.asn.list[k] : '' },
+    { title: 'Countries', T: C, need: 'needs a country database', name: k => ccName(D.cc.list[k]), tok: k => 'cc:' + D.cc.list[k], sub: k => D.cc.list[k] },
+    { title: 'Destination ports', T: P, name: k => String(k), tok: k => 'dpt:' + k, sub: k => svcName(k) },
+  ];
+  let total = 0;
+  for (const col of cols) {
+    const box = el('div');
+    if (!col.T) { box.append(el('h3', null, col.title), el('div', 'none', col.need)); grid.append(box); continue; }
+    const ks = fresh(col.T); total += ks.length;
+    const h = el('h3', null, col.title); h.append(el('b', null, fmtN(ks.length))); box.append(h);
+    if (!ks.length) box.append(el('div', 'none', 'nothing new'));
+    for (const k of ks.slice(0, NEW_SHOW)) {
+      const row = el('div', 'newrow'), lbl = el('span', 'nl', col.name(k)), sub = col.sub(k);
+      if (sub) { lbl.append(' '); lbl.append(el('small', null, sub)); }
+      row.append(lbl, el('span', 'nc', fmtN(col.T.n[k])));
+      row.addEventListener('pointermove', e => showTip(e, col.name(k), [{ value: fmtN(col.T.n[k]), label: 'events in window' }, { value: fmtTime(col.T.first[k]), label: 'first seen' }]));
+      row.addEventListener('pointerleave', hideTip);
+      row.addEventListener('click', e => addToken(col.tok(k), e.shiftKey));
+      box.append(row);
+    }
+    if (ks.length > NEW_SHOW) box.append(el('div', 'none', `+ ${fmtN(ks.length - NEW_SHOW)} more`));
+    grid.append(box);
+  }
+  $('#newSub').textContent = inWin ? `${fmtN(inWin)} events since ${fmtTime(start)}` : 'no events in this window';
+  // without enough earlier history, everything looks new
+  const before = firstTs === firstTs ? start - firstTs : 0;
+  note.hidden = before >= wl;
+  note.textContent = before <= 0
+    ? 'All loaded events fall inside this window, so there is nothing to compare against. Load older logs or pick a shorter window.'
+    : `Only ${fmtDur(before)} of history before this window is loaded, so some of these may not really be new. Loading older logs makes this more reliable.`;
+}
+$('#newWin').addEventListener('click', e => { const w = e.target.dataset.w; if (!w || w === F.newWin) return; F.newWin = w; renderNew(); saveView(); });
 
 /* ============================================================ render: heatmap */
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -1813,6 +1909,9 @@ function makeSample() {
     add(t, o);
   }
 
+  // 12) a newcomer in the last day: a new network and country probing ports nobody touched before
+  { const t0 = end - 16 * 36e5; for (let k = 0; k < 70; k++) add(t0 + k * ri(300, 900) * 1000, { act: 'BLOCK', in: 'eth0', out: '', src: DEMO_NEWCOMER, dst: '2001:db8:1::10', proto: 'TCP', spt: ri(30000, 60000), dpt: pick([2222, 2222, 9443, 60001, 22, 443]), flags: 'SYN', ttl: 54, len: 80, mac: macStr('00:0d:b9:11:22:33', macs.gw, true) }); }
+
   // 11) a Windows desktop on the LAN with pfirewall.log logging (dropped inbound, some allowed outbound)
   const WIN = '192.168.1.60';
   for (let t = startT; t < end; t += ri(60, 600) * 1000) {
@@ -1867,6 +1966,7 @@ $('#btnSample').onclick = () => { resetStore(); D.demoGeo = true; loadText('samp
 const geoInput = Object.assign(document.createElement('input'), { type: 'file', multiple: true, accept: '.mmdb,.gz' });
 geoInput.onchange = () => { loadFiles(geoInput.files); geoInput.value = ''; };
 $('#btnGeoDb').onclick = () => geoInput.click();
+namesStatus();
 IDB.all().then(rows => { for (const r of rows) { try { addGeo(r.name, r.buf, false); } catch {} } geoStatus(); if (rows.length && D && D.n) { geoIndex(); setQuery($('#q').value); } });
 $('#btnPaste').onclick = () => { $('#pasteText').value = ''; $('#pasteDlg').showModal(); };
 $('#pasteCancel').onclick = () => $('#pasteDlg').close();

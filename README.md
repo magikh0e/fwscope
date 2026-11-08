@@ -80,6 +80,7 @@ How it maps onto the dashboard:
 - **Stat tiles**: events by action, unique sources, destination ports, busiest source, time span
 - **Events over time**: stacked by action (BLOCK / LIMIT / ALLOW / AUDIT). Drag to zoom into a range, double-click to reset.
 - **Two "Top" lists**, each switchable: sources, source subnets (/24 and /64), destinations, destination and source ports (with service names), protocols, in/out interfaces, ICMP types, source MACs, logging hosts, exact action tags
+- **New in the last hour / 24 hours / 7 days**: sources, networks, countries and destination ports first seen in that window and never earlier in the loaded logs. The window ends at the newest event loaded. It follows the current filter but always looks back through all loaded history, so `dpt:22` gives you new SSH sources. It warns you when too little history is loaded to tell what's actually new. Busy routers turn up lots of "new" high ports from ordinary traffic; `act:block` narrows it to what was blocked.
 - **Weekday × hour heatmap**
 - **Likely port scans**: sources ranked by how many distinct destination ports they hit
 - **Event table** with paging. Click any cell to filter on it.
