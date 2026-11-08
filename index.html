@@ -265,6 +265,20 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
 .since-label { font-size: 13px; color: var(--ink-2); min-width: 190px; }
 .since-more { font-size: 12px; color: var(--muted); }
 .chip-btn { font-size: 12px; padding: 2px 9px; border-radius: 10px; font-family: inherit; }
+.jump { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 2px 4px; align-items: center; padding: 6px 4px; margin: -4px 0 0;
+  background: var(--page); border-bottom: 1px solid var(--ring); font-size: 12.5px; }
+.jump a { color: var(--ink-2); text-decoration: none; padding: 2px 8px; border-radius: 10px; }
+.jump a:hover { background: var(--surface-2); color: var(--ink); }
+.jump a.dim { color: var(--muted); }
+.jump a.top { margin-left: auto; }
+.card > .card-head .fold { border: 0; background: none; padding: 0 4px 0 0; width: 18px; color: var(--muted); font-size: 12px; line-height: 1; }
+.card > .card-head .fold::before { content: '▾'; display: inline-block; transition: transform .15s; }
+.card.folded > .card-head .fold::before { transform: rotate(-90deg); }
+.card > .card-head h2.fold-title { cursor: pointer; }
+.card.folded > :not(.card-head), .card.quiet > :not(.card-head) { display: none !important; }
+.card.folded > .card-head, .card.quiet > .card-head { margin-bottom: 0; }
+.card.quiet h2 { color: var(--ink-2); }
+[id$="Card"], #rankGrid { scroll-margin-top: 44px; }
 .credit { color: var(--muted); font-size: 12px; text-align: center; margin: 8px 0 24px; }
 .credit a { color: inherit; }
 [hidden] { display: none !important; }
@@ -489,6 +503,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <div id="qerr" class="qerr"></div>
     </div>
 
+    <nav class="jump" id="jump" aria-label="Jump to a part of the dashboard"></nav>
     <div class="tiles" id="tiles"></div>
     <div class="card since" id="sinceCard" hidden>
       <div class="card-head"><h2>Since your last visit</h2><span class="sub" id="sinceSub"></span><span class="grow"></span><button id="btnForgetVisits" title="Forget what earlier visits saw; the next visit starts fresh">Forget history</button></div>
@@ -496,7 +511,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <div class="hint">Compared with what this browser saw on earlier visits (it keeps hashed addresses, not the addresses). Public sources only; ports count blocked traffic. Click to filter, shift-click to exclude.</div>
     </div>
 
-    <div class="card">
+    <div class="card" id="tlCard">
       <div class="card-head"><h2>Events over time</h2><span class="sub" id="tlSub"></span><span class="grow"></span><label class="tog" id="tlSplitWrap" hidden title="Firewall and WAF events as two charts on the same time axis, each with its own scale"><input type="checkbox" id="tlSplit" checked> Split firewall / WAF</label><div class="legend" id="tlLegend"></div></div>
       <svg id="tl"></svg>
       <div class="hint">Drag across the chart to zoom into a time range. Double-click to reset.</div>
@@ -561,7 +576,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <div class="hint">Both periods end at the newest event loaded and use the current filter (its time range aside). Sorted by the size of the change. Click a row to filter to it.</div>
     </div>
 
-    <div class="grid2">
+    <div class="grid2" id="rankGrid">
       <div class="card" data-rank="A">
         <div class="card-head"><h2>Top</h2><select class="dimSel"></select><span class="grow"></span><span class="sub rankSub"></span></div>
         <div class="rank"></div>
@@ -575,12 +590,12 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
     </div>
 
     <div class="grid2">
-      <div class="card">
+      <div class="card" id="heatCard">
         <div class="card-head"><h2>When it happens</h2><span class="sub">events by weekday and hour, your local time</span></div>
         <div class="hm" id="hm"></div>
         <div class="scale" id="hmScale"></div>
       </div>
-      <div class="card">
+      <div class="card" id="scanCard">
         <div class="card-head"><h2>Scans and hammering</h2><span class="sub">blocked sources sweeping many ports, or hitting the same port over and over</span></div>
         <div class="tbl-wrap"><table id="scan"></table></div>
       </div>
@@ -603,12 +618,12 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <div class="hint">Based on your WAF logs: sources the WAF caught attacking (web scans, web hammering, attack rules, fake crawlers) whose requests still reached the web app, as they do in detection-only mode. Firewall logs, if loaded, only add supporting evidence (a port scan, "firewall + WAF"); traffic your firewall already drops isn't a reason to block anything. Never suggested: your own and LAN addresses, Cloudflare's ranges, verified crawlers, and your never-block list. Three or more strong attackers in one /24 (IPv6 /64) are also offered as the whole range. Tick what to block, then write a script; nothing is applied from here.</div>
     </div>
 
-    <div class="card">
+    <div class="card" id="evCard">
       <div class="card-head"><h2>Events</h2><span class="sub" id="evSub"></span><span class="grow"></span>
         <button id="btnCsv">Export CSV</button><button id="btnIps">Source IP list</button><button id="btnAbuse" title="Draft a report to the network owner about one source. Filter to a single source first, e.g. by clicking it in a list.">Abuse report</button>
       </div>
       <div class="tbl-wrap"><table id="ev"></table></div>
-      <div class="pager"><button id="pgNew">◀ Newer</button><button id="pgOld">Older ▶</button><span id="pgText"></span><span class="grow"></span><label class="tog"><input type="checkbox" id="oldestFirst"> Oldest first</label></div>
+      <div class="pager"><button id="pgNew">◀ Newer</button><button id="pgOld">Older ▶</button><span id="pgText"></span><span class="grow"></span><label class="tog">Rows <select id="rowsSel"><option>25</option><option>100</option><option>500</option></select></label><label class="tog"><input type="checkbox" id="oldestFirst"> Oldest first</label></div>
     </div>
     <details class="card files" id="filesCard" hidden><summary><b>Loaded files</b> <span class="sub" id="filesSub"></span></summary>
       <div class="tbl-wrap"><table id="filesTable"></table></div>
@@ -2250,11 +2265,52 @@ const groupRows = (counts, total) => {
   return rows;
 };
 
+/* ============================================================ dashboard layout: jump bar, folding, quiet cards */
+// A card with nothing to show keeps only its heading, with a short reason next to it.
+function quiet(card, on, why) {
+  if (!card) return;
+  card.classList.toggle('quiet', !!on);
+  let q = card.querySelector(':scope > .card-head > .quiet-why');
+  if (on && why) { if (!q) { q = el('span', 'sub quiet-why'); card.querySelector(':scope > .card-head').append(q); } q.textContent = '· ' + why; }
+  else if (q) q.remove();
+  jumpBar();
+}
+// Fold any card by its heading; folded cards are remembered in this browser.
+const cardKey = c => c.id || (c.dataset.rank ? 'rank' + c.dataset.rank : '');
+let FOLDED = new Set(); try { FOLDED = new Set(JSON.parse(localStorage.getItem('fwscope-folded') || '[]')); } catch {}
+function foldable() {
+  for (const card of document.querySelectorAll('#dash .card')) {
+    const head = card.querySelector(':scope > .card-head'), key = cardKey(card);
+    if (!head || !key || head.querySelector('.fold')) continue;
+    const b = el('button', 'fold'); b.type = 'button';
+    const h2 = head.querySelector('h2');
+    const set = on => { card.classList.toggle('folded', on); b.setAttribute('aria-expanded', on ? 'false' : 'true'); b.title = (on ? 'Show ' : 'Fold ') + (h2 ? h2.textContent.trim() : 'this card'); b.setAttribute('aria-label', b.title); };
+    b.onclick = () => { const on = !card.classList.contains('folded'); set(on); on ? FOLDED.add(key) : FOLDED.delete(key); try { localStorage.setItem('fwscope-folded', JSON.stringify([...FOLDED])); } catch {} };
+    if (h2) { h2.classList.add('fold-title'); h2.onclick = () => b.click(); }
+    head.prepend(b); set(FOLDED.has(key));
+  }
+}
+// Jump bar: one link per part of the dashboard that's showing, so nothing is more than a click away.
+const JUMPS = [['tlCard', 'Timeline'], ['sinceCard', 'Since last visit'], ['geoCard', 'Map'], ['whatifCard', 'What-if'], ['tuneCard', 'Tuning'], ['newCard', 'New'], ['cmpCard', 'Compare'],
+  ['rankGrid', 'Top lists'], ['heatCard', 'When'], ['scanCard', 'Scans'], ['blockCard', 'Block'], ['evCard', 'Events'], ['filesCard', 'Files']];
+function jumpBar() {
+  const nav = $('#jump'); if (!nav) return;
+  nav.textContent = '';
+  for (const [id, label] of JUMPS) {
+    const t = document.getElementById(id);
+    if (!t || t.hidden) continue;
+    const a = el('a', t.classList.contains('quiet') ? 'dim' : null, label); a.href = '#' + id;
+    a.onclick = e => { e.preventDefault(); if (t.classList.contains('folded')) t.querySelector('.fold')?.click(); if (t.tagName === 'DETAILS') t.open = true; t.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    nav.append(a);
+  }
+  const top = el('a', 'top', '↑ Top'); top.href = '#'; top.onclick = e => { e.preventDefault(); scrollTo({ top: 0, behavior: 'smooth' }); }; nav.append(top);
+}
+foldable();
 /* ============================================================ render: tiles */
 function renderAll() {
   hideTip(); syncPresets();
   namesStatus(); blistStatus(); rdnsStatus(); renderTiles(); renderTimeline(); renderMap(); renderWhatIf(); renderTuning(); renderNew(); renderCompare(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderBlock(); renderEvents();
-  renderFiles();
+  renderFiles(); jumpBar();
   const f = D.files.map(f => `${f.name} (${fmtN(f.events)}${f.partial ? ', stopped partway' : ''})`).join(', ');
   $('#foot').textContent = `${fmtN(D.n)} events from ${D.files.length} source${D.files.length > 1 ? 's' : ''}: ${f}.` +
     (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') +
@@ -3145,6 +3201,7 @@ function renderTuning() {
   const tb = $('#tuneTable'); tb.textContent = '';
   $('#tuneSub').textContent = (TUNE.length ? `${TUNE.length} candidate${TUNE.length > 1 ? 's' : ''} at threshold ${T}` : '') + (noiseOnly ? `${TUNE.length ? '; ' : ''}${fmtN(noiseOnly)} more would only cut log noise (no change in what's blocked)` : '');
   $('#btnTune').disabled = !TUNE.length;
+  quiet(card, !TUNE.length);
   if (!TUNE.length) { const tr = el('tr'); tr.append(el('td', null, noiseOnly ? `Nothing here would change what's blocked at threshold ${T}.` : 'No rule fires mostly on crawler or own-address traffic in this filter.')); tb.append(tr); return; }
   const hr = el('tr'); for (const h of ['Rule', 'Where', 'Hits', 'From crawlers / own', `Unblocks at ${T}: legit · other`, '']) hr.append(el('th', null, h)); tb.append(hr);
   for (const a of TUNE) {
@@ -3268,6 +3325,7 @@ function renderCompare() {
   note.textContent = span < L ? `The loaded logs cover less than a ${name}, so there's nothing before to compare with. Pick a shorter period or load older logs.` : `The loaded logs only cover ${fmtDur(span)}, so the earlier ${name} is incomplete.`;
   const rows = [...cnt].sort((x, y) => Math.abs(y[1][1] - y[1][0]) - Math.abs(x[1][1] - x[1][0]) || y[1][1] - x[1][1]).slice(0, 15);
   const tb = $('#cmpTable'); tb.textContent = '';
+  quiet($('#cmpCard'), !rows.length, `no events in the last two ${name}s`);
   if (!rows.length) { const tr = el('tr'); tr.append(el('td', null, `No events in the last two ${name}s for this filter.`)); tb.append(tr); return; }
   const hr = el('tr'); for (const h of [dim.label.replace(/ \(.*\)$/, ''), `Previous ${name}`, `Last ${name}`, 'Change']) hr.append(el('th', null, h)); tb.append(hr);
   for (const [k, [b, a]] of rows) {
@@ -3380,6 +3438,7 @@ function renderScans() {
   const crawlers = all.filter(r => r[2] === 'crawler').sort((a, b) => b[1].n - a[1].n).slice(0, 3); // last: usually harmless
   const rows = scans.concat(focused, crawlers);
   const tb = $('#scan'); tb.textContent = '';
+  quiet($('#scanCard'), !rows.length, 'nothing in this filter');
   if (!rows.length) { const tr = el('tr'); tr.append(el('td', null, 'No scanning or hammering sources among the blocked events in this filter.')); tb.append(tr); return; }
   const hr = el('tr'); for (const h of ['Source', ...(D.geo ? ['Network'] : []), 'Pattern', D.waf ? 'Ports / paths' : 'Ports', 'Events', 'Over', 'Sample']) hr.append(el('th', null, h)); tb.append(hr);
   for (const [src, s, pat] of rows) {
@@ -3413,7 +3472,8 @@ function renderScans() {
 }
 
 /* ============================================================ render: event table */
-const PAGE = 100;
+let PAGE = 25; // rows per page of the events table; the picker under it changes it
+try { const r = +localStorage.getItem('fwscope-rows'); if ([25, 100, 500].includes(r)) PAGE = r; } catch {}
 // Sorting: every sortable column maps a row to a small integer rank (-1 = no value, always last), so the
 // rows can be bucket-sorted in one stable pass, fast even for millions. Ties keep time order.
 const byLabel = (list, label, plain) => { const ids = list.map((_, i) => i).sort(plain ? (a, b) => { const x = label(a), y = label(b); return x < y ? -1 : x > y ? 1 : 0; } : (a, b) => label(a).localeCompare(label(b), undefined, { numeric: true })); const r = new Int32Array(list.length); ids.forEach((id, k) => r[id] = k); return r; };
@@ -3569,6 +3629,8 @@ function renderEvents() {
   $('#pgOld').textContent = sortCol ? 'Next ▶' : F.oldestFirst ? 'Newer ▶' : 'Older ▶';
 }
 $('#pgNew').onclick = () => { F.page--; renderEvents(); };
+$('#rowsSel').value = String(PAGE);
+$('#rowsSel').onchange = e => { PAGE = +e.target.value; F.page = 0; try { localStorage.setItem('fwscope-rows', PAGE); } catch {} renderEvents(); };
 $('#pgOld').onclick = () => { F.page++; renderEvents(); };
 $('#oldestFirst').onchange = e => { F.oldestFirst = e.target.checked; F.page = 0; renderEvents(); saveView(); };
 
@@ -3726,7 +3788,8 @@ $('#btnAbuse').onclick = () => abuseReport();
    Who's worth blocking: sources with attack evidence, weighted up when they got through to something open
    (allowed/passed connections, or WAF requests the server answered). Excluded: own/LAN addresses, Cloudflare,
    verified crawlers, the never-block list. Clusters of 3+ attackers in a /24 (or /64) become one range. */
-let BLOCK = [], BLOCKSEL = new Set(), blockShowDropped = false;
+let BLOCK = [], BLOCKSEL = new Set(), blockShowDropped = false, blockShowAll = false;
+const BLOCK_FIRST = 15; // rows shown before "Show all"
 const BLOCK_ALLOW_KEY = 'fwscope-never-block';
 let blockAllow = '';
 try { blockAllow = localStorage.getItem(BLOCK_ALLOW_KEY) || ''; } catch {}
@@ -3826,7 +3889,8 @@ function renderBlock() {
   const th0 = el('th'); th0.append(all); hr.append(th0);
   for (const h of ['Block', ...(D.geo ? ['Network'] : []), 'Why', 'Reached the web app']) hr.append(el('th', null, h));
   tb.append(hr);
-  for (const x of BLOCK) {
+  const shown = blockShowAll ? BLOCK.length : Math.min(BLOCK.length, BLOCK_FIRST);
+  for (const x of BLOCK.slice(0, shown)) {
     const tr = el('tr');
     const cb = el('input'); cb.type = 'checkbox'; cb.checked = BLOCKSEL.has(x.key); cb.dataset.key = x.key; cb.setAttribute('aria-label', 'Block ' + x.key);
     cb.onchange = () => { if (cb.checked) BLOCKSEL.add(x.key); else BLOCKSEL.delete(x.key); $('#blockSub').textContent = `${fmtN(BLOCKSEL.size)} of ${fmtN(BLOCK.length)} ticked`; };
@@ -3837,6 +3901,13 @@ function renderBlock() {
     const gt = el('td', null, x.reached ? `${fmtN(x.reached)} of ${fmtN(x.n)}` : `none of ${fmtN(x.n)}`); gt.title = 'WAF requests that reached the web app (not intercepted), out of all events from this source, firewall ones included';
     tr.append(el('td', 'why2', x.reasons.join('; ')), gt);
     tb.append(tr);
+  }
+  if (shown < BLOCK.length) { // the rest, one click away; ticked ones still go into the script, so say how many
+    const rest = BLOCK.slice(shown), ticked = rest.filter(x => BLOCKSEL.has(x.key)).length;
+    const tr = el('tr'), td = el('td'); td.colSpan = D.geo ? 5 : 4;
+    const b = el('button', null, `Show all ${fmtN(BLOCK.length)}`); b.onclick = () => { blockShowAll = true; renderBlock(); };
+    td.append(b, el('span', 'sub', ` ${fmtN(rest.length)} more, weaker suggestions` + (ticked ? `; ${fmtN(ticked)} of them ticked` : '')));
+    tr.append(td); tb.append(tr);
   }
 }
 function renderBlockTicks() { for (const cb of document.querySelectorAll('#blockTable input[data-key]')) cb.checked = BLOCKSEL.has(cb.dataset.key); $('#blockSub').textContent = `${fmtN(BLOCKSEL.size)} of ${fmtN(BLOCK.length)} ticked`; }
@@ -4006,6 +4077,7 @@ function saveReport() {
   const win = dash.querySelector('#newWin'); if (win) win.replaceWith(el('span', 'report-pick', live.querySelector('#newWin .on')?.textContent || ''));
   dash.querySelector('.filters')?.closest('.card')?.remove();
   dash.querySelector('#ev')?.closest('.card')?.remove();
+  dash.querySelector('#jump')?.remove(); dash.querySelectorAll('.folded').forEach(c => c.classList.remove('folded'));
   dash.querySelector('#blockCard')?.remove(); dash.querySelector('#filesCard')?.remove(); dash.querySelector('#sinceCard')?.remove();
   dash.querySelectorAll('button, input, .hint, #tip').forEach(e => e.remove());
   dash.querySelectorAll('[title="Filter to this source"]').forEach(e => e.removeAttribute('title'));

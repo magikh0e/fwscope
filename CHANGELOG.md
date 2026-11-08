@@ -2,6 +2,17 @@
 
 What changed in each release of fwscope. The newest is at the top. Version numbers follow [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed
+- **A tidier dashboard** (about a third shorter on the sample):
+  - a **jump bar** that stays at the top, with a link to each part of the dashboard that's showing
+  - **fold any card** by its heading or arrow; folded cards stay folded next time
+  - the events table shows **25 rows** by default, with a picker for 100 or 500
+  - **block suggestions** list the strongest 15 first, with **Show all** (and how many of the hidden ones are ticked)
+  - cards with nothing to show (no tuning candidates, no scans, nothing to compare) shrink to their heading
+- fwscope-pull's helper page: fields sit under their labels, and its controls follow the dark theme.
+
 ## 1.4.0 (2026-11-08)
 
 ### Added

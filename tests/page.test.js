@@ -295,3 +295,33 @@ test('host names from file names, including the <host>-<log> names fwscope-pull.
   assert.equal(p.g('hostFromFile("web1-fail2ban.log.1", "fail2ban")'), 'web1');
   assert.equal(p.g('hostFromFile("fail2ban.log", "fail2ban")'), '');
 });
+
+test('dashboard layout: 25 rows by default, foldable cards that stay folded, a jump bar, quiet empty cards', async () => {
+  const p = openPage({ url: 'http://localhost/?demo&tz=UTC' });
+  await until(() => p.g('typeof D !== "undefined" && D && D.n > 0 && D.order'));
+  await new Promise(r => setTimeout(r, 300));
+  const doc = p.w.document;
+  assert.equal(doc.querySelectorAll('#ev tr').length, 26, 'header + 25 rows');
+  p.g('$("#rowsSel").value = "100"; $("#rowsSel").dispatchEvent(new Event("change"))');
+  assert.equal(doc.querySelectorAll('#ev tr').length, 101);
+  assert.equal(p.g('localStorage.getItem("fwscope-rows")'), '100');
+  p.g('$("#geoCard .fold").click()');
+  assert.ok(doc.querySelector('#geoCard').classList.contains('folded'));
+  assert.deepEqual(JSON.parse(p.g('localStorage.getItem("fwscope-folded")')), ['geoCard']);
+  const jumps = [...doc.querySelectorAll('#jump a')].map(a => a.getAttribute('href'));
+  assert.ok(jumps.includes('#evCard') && jumps.includes('#blockCard') && jumps.includes('#tlCard'), jumps.join());
+  assert.ok(!jumps.includes('#sinceCard'), 'hidden cards get no link');
+  // the sample has no tuning candidates: that card shrinks to its heading
+  assert.ok(doc.querySelector('#tuneCard').classList.contains('quiet'));
+  // block suggestions: the strongest first, the rest one click away
+  const rows = () => doc.querySelectorAll('#blockTable input[data-key]').length;
+  assert.equal(rows(), 15);
+  assert.match(doc.querySelector('#blockTable tr:last-child').textContent, /^Show all \d+/);
+  doc.querySelector('#blockTable tr:last-child button').click();
+  assert.ok(rows() > 15);
+  // the saved report shows every card unfolded and no jump bar
+  p.w.URL.createObjectURL = () => 'blob:x'; p.w.URL.revokeObjectURL = () => {};
+  const html = p.g('saveReport()');
+  assert.ok(!html.includes('id="jump"'), 'no jump bar');
+  assert.ok(!/class="[^"]*folded/.test(html), 'no folded cards');
+});
