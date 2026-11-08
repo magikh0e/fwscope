@@ -19,7 +19,7 @@ A single-file, offline visualizer for firewall and WAF logs: UFW, nftables / ipt
 - `dmesg -T` (plain `dmesg` works too, but those lines have no wall-clock time, so they're left out of the time charts)
 - Pasted lines
 
-Lines that aren't firewall log lines are ignored, so you can feed it a whole `syslog`. Drop several files at once to merge them. UFW's default rsyslog config writes each line to `ufw.log`, `kern.log` *and* `syslog`, so a line that shows up again in a later file is skipped as a duplicate.
+Lines that aren't firewall log lines are ignored, so you can feed it a whole `syslog`. Drop several files at once to merge them. You can also add files later: once logs are loaded, **Open logs** becomes **Add logs**, and dropping files on the dashboard adds them too. Each addition says how many new events it brought and how many duplicates were skipped. **Clear** starts over. UFW's default rsyslog config writes each line to `ufw.log`, `kern.log` *and* `syslog`, so a line that shows up again in a later file is skipped as a duplicate.
 
 ### Getting the logs
 
@@ -43,7 +43,11 @@ firewalld logs refused packets after `firewall-cmd --set-log-denied=all`.
 
 ### fail2ban
 
-fail2ban's own log (`/var/log/fail2ban.log`) shows what it found, banned and unbanned. Each line becomes an event: **F2B BAN** (blocks, including `Restore Ban` after a restart), **F2B FOUND** (a matched failure, in the AUDIT group) or **F2B UNBAN** (allowed group). The jail (`sshd`, `nginx-botsearch` …) shows as the rule, so the Rules list and `rule:sshd` work. Load it alongside the firewall or WAF logs to see which attackers fail2ban caught and which it missed.
+fail2ban's own log (`/var/log/fail2ban.log`) shows what it found, banned and unbanned. Each line becomes an event: **F2B BAN** (blocks, including `Restore Ban` after a restart), **F2B FOUND** (a matched failure, in the AUDIT group) or **F2B UNBAN** (allowed group). The jail (`sshd`, `nginx-botsearch` …) shows as the rule, so the Rules list and `rule:sshd` work. Load it alongside the firewall or WAF logs to see which attackers fail2ban caught and which it missed:
+
+- the **Scans** card marks each scanner or hammerer **fail2ban banned** or **not banned** (a missed one usually means no jail covers that service)
+- **Block suggestions** say the same in their reasons
+- the **Sources** list notes **banned by fail2ban**, and `seen:f2b` filters to the sources it banned (`-seen:f2b` to the rest)
 
 ## OPNsense / pfSense
 
@@ -339,7 +343,7 @@ The filter box takes space-separated terms. All of them must match.
 | `score:` | `score:10-1000`: requests with an inbound anomaly score of 10 or more (WAF) |
 | `rdns:` | `rdns:googlebot.com` (hostname ends with), `rdns:*.amazonaws.com`, `rdns:confirmed`, `rdns:unconfirmed`, `rdns:none` (looked up, no name). Only sources that have been looked up can match; see [Hostnames](#hostnames-reverse-dns) |
 | `app:` | `app:firefox.exe`, `app:steam`, `app:svc*` (Windows Security log) |
-| `seen:` | `seen:both`: addresses in both the firewall and the WAF logs (`seen:waf`, `seen:fw`) |
+| `seen:` | `seen:both`: addresses in both the firewall and the WAF logs (`seen:waf`, `seen:fw`); `seen:f2b`: sources fail2ban banned |
 | `act:` | `act:block`, `act:limit_block`, `act:audit_invalid` |
 | `flag:` | `flag:syn`, `flag:rst` (SYN ACK FIN RST PSH URG ECE CWR DF) |
 | `type:` `ttl:` `len:` | `type:8` (ICMP echo request), `ttl:1-10` |
@@ -357,6 +361,10 @@ The filter bar also has time presets (relative to the newest event in the logs, 
 - Classic syslog, `dmesg -T` and Windows Firewall timestamps have no timezone (syslog has no year either; it's inferred from the file's modified date). **Logs without a timezone are in**, under the header, sets the zone the logging machine was in: your browser's own by default, UTC, or any named zone like `America/New_York`. Named zones handle daylight saving. It applies to logs you load next. ISO, journal and OPNsense timestamps carry their own offset and aren't affected. Everything is shown in your browser's timezone.
 - Data is stored in columns of typed arrays (about 55 bytes per event), so filtering stays fast even with millions of events.
 - **Sample data** generates a fake week of logs using the documentation IP ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32), so no real addresses are implicated.
+
+## Changes
+
+What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Tests
 

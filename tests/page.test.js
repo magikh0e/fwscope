@@ -115,3 +115,71 @@ test('block suggestions: requests Cloudflare already blocked did not reach the s
   const hit = list.find(x => x.key === '203.0.113.20');
   assert.ok(!hit || hit.reached === 0, JSON.stringify(list));
 });
+
+test('fail2ban: seen:f2b, caught / missed marks, and fail2ban lines are not firewall traffic', async () => {
+  const p = openPage();
+  // 120 hits on one port: "hammering" in the Scans card
+  const ssh = (src, k) => `Nov  7 1${Math.floor(k / 60)}:${String(k % 60).padStart(2, '0')}:00 web kernel: [UFW LIMIT BLOCK] IN=eth0 OUT= SRC=${src} DST=192.0.2.10 LEN=60 PROTO=TCP SPT=${40000 + k} DPT=22`;
+  await p.load('ufw.log', [...Array.from({ length: 120 }, (_, k) => ssh('203.0.113.5', k)), ...Array.from({ length: 120 }, (_, k) => ssh('203.0.113.9', k))].join('\n'));
+  await p.load('fail2ban.log', [
+    '2026-11-07 10:05:00,000 fail2ban.actions        [811]: NOTICE  [sshd] Ban 203.0.113.5',
+    '2026-11-07 10:06:00,000 fail2ban.filter         [811]: INFO    [sshd] Found 198.51.100.77 - 2026-11-07 10:06:00',
+  ].join('\n'));
+  const count = q => p.g(`F.preds = compileQuery(${JSON.stringify(q)}); filterRows(null).length`);
+  assert.equal(count('seen:f2b'), 121, 'every event from the banned source, plus the ban itself');
+  assert.equal(p.g('D.ipSeen[D.ip.map.get("198.51.100.77")]'), 0, 'found by fail2ban only: not seen by the firewall');
+  p.g('setQuery("dpt:22")'); p.g('F.preset = "all"; apply()');
+  const marks = [...p.w.document.querySelectorAll('#scan tr')].map(tr => tr.textContent);
+  assert.ok(marks.some(t => t.includes('203.0.113.5') && t.includes('fail2ban banned')), marks.join('\n'));
+  assert.ok(marks.some(t => t.includes('203.0.113.9') && t.includes('not banned')), marks.join('\n'));
+});
+
+test('a fail2ban filter without a fail2ban log explains itself', async () => {
+  const p = openPage();
+  await p.load('ufw.log', LINES.join('\n'));
+  assert.throws(() => p.g('compileQuery("seen:f2b")'), /fail2ban/);
+});
+
+test('the rate-limit chip is named after what is in it', async () => {
+  const p = openPage();
+  await p.load('cf.json', JSON.stringify({ Action: 'managed_challenge', ClientIP: '203.0.113.20', ClientRequestPath: '/', Datetime: '2026-11-07T10:00:00Z', RayID: 'r', RuleID: 'x', Source: 'bic' }));
+  assert.equal(p.g('GROUPS[1].name'), 'CHALLENGE');
+  await p.load('ufw.log', 'Nov  7 10:00:01 web kernel: [UFW LIMIT BLOCK] IN=eth0 OUT= SRC=203.0.113.5 DST=192.0.2.10 LEN=60 PROTO=TCP SPT=1 DPT=22');
+  assert.equal(p.g('GROUPS[1].name'), 'LIMIT/CHALLENGE');
+  assert.match(p.w.document.querySelector('#foot').textContent, /1 events are from Cloudflare's own firewall/);
+  assert.doesNotMatch(p.w.document.querySelector('#foot').textContent, /CF-Connecting-IP/);
+});
+
+test('the saved report names the tool version and its author', async () => {
+  const p = openPage();
+  await p.load('ufw.log', LINES.join('\n'));
+  p.w.URL.createObjectURL = () => 'blob:x'; p.w.URL.revokeObjectURL = () => {};
+  const html = p.g('saveReport()');
+  const v = p.g('document.querySelector("meta[name=version]").content');
+  assert.match(v, /^\d+\.\d+\.\d+$/);
+  assert.ok(html.includes(`<meta name="generator" content="fwscope ${v}">`));
+  assert.ok(html.includes(`fwscope ${v} by`) && html.includes('magikh0e'));
+});
+
+test('files can be added to what is loaded, one at a time', async () => {
+  const p = openPage();
+  await p.load('web1.log', LINES.slice(0, 3).join('\n'));
+  assert.equal(p.g('$("#btnOpen").textContent'), 'Add logs');
+  p.g('BLOCKSEL.add("203.0.113.40")');
+  await p.load('web2.log', LINES.slice(2).join('\n')); // one line repeats
+  assert.equal(p.g('D.n'), 5);
+  assert.equal(p.g('D.files.length'), 2);
+  assert.match(p.g('$("#toast").textContent'), /^Added web2\.log: 2 new events, 1 duplicate skipped\. 2 files loaded\./);
+  assert.ok(p.g('BLOCKSEL.has("203.0.113.40")'), 'block ticks survive an added file');
+  p.g('$("#btnClear").click()');
+  assert.equal(p.g('$("#btnOpen").textContent'), 'Open logs');
+});
+
+test('pasting real lines replaces the sample instead of mixing with it', async () => {
+  const p = openPage({ url: 'http://localhost/?demo&tz=UTC' });
+  await until(() => p.g('typeof D !== "undefined" && D && D.n > 0 && D.order'));
+  assert.equal(p.g('$("#btnOpen").textContent'), 'Open logs');
+  await p.w.loadText('pasted text', LINES.join('\n'));
+  assert.equal(p.g('D.n'), 5);
+  assert.equal(p.g('$("#toast").hidden'), true, 'a replacement is not an "added" message');
+});
