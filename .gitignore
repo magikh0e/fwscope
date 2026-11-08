@@ -25,3 +25,7 @@ rules.debug
 !package.json
 !package-lock.json
 node_modules/
+
+# fwscope-pull.py output (real logs)
+fwscope-logs/
+__pycache__/

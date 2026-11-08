@@ -82,6 +82,7 @@ header.top h1 span { color: var(--muted); font-weight: 400; }
 .fmt-tabs button[aria-selected="true"] { background: var(--accent); border-color: transparent; color: #fff; }
 .fmt-panel h3:first-child { margin-top: 4px; }
 .fmt-panel .step { color: var(--ink-2); margin: 4px 0; }
+.fmt-panel .pull { color: var(--ink-2); margin: 12px 0 2px; font-size: 13px; border-top: 1px solid var(--ring); padding-top: 10px; }
 .howto details.more summary { cursor: pointer; color: var(--ink-2); font-size: 12.5px; margin-top: 8px; }
 .split { position: relative; display: inline-flex; }
 .split > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
@@ -300,7 +301,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <button class="primary" id="btnReopen">Reopen</button> <button id="btnForget">Forget it</button>
     </div>
     <div id="drop">
-      <h2 style="margin:0 0 8px">Drop firewall or WAF logs here</h2>
+      <h2 style="margin:0 0 8px">Drop firewall, WAF or IDS logs here</h2>
       <p class="fmt-list">UFW · nftables · OpenWrt · OPNsense / pfSense · Windows Firewall · AWS VPC · Azure · fail2ban · Suricata · ModSecurity / Coraza · Cloudflare</p>
       <p>Files, a whole folder or rotated <code>.gz</code> logs. Several at once are merged and repeated lines skipped; add more any time.</p>
       <p><button id="btnTry">Try it on sample data</button></p>
@@ -330,6 +331,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <pre>journalctl -k -g 'UFW ' -o short-iso --since '-7d' &gt; ufw-journal.log</pre>
         <pre>scp you@server:'~/ufw.log*' .</pre>
         <ul><li>Also fine: <code>kern.log</code>, <code>syslog</code>, <code>dmesg -T</code> and <code>journalctl -o json</code>. UFW writes each line to three of those files; the copies are skipped.</li></ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on, or <code>sudo python3 fwscope-pull.py local</code> on the server itself:</p>
+        <pre>python3 fwscope-pull.py ssh you@server --sudo</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="nft" hidden>
@@ -342,6 +345,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <h3>2. Grab the log</h3>
         <pre>journalctl -k -g 'SRC=' -o short-iso --since '-7d' &gt; netfilter.log</pre>
         <ul><li>Any kernel line with <code>SRC=</code>, <code>DST=</code> and <code>PROTO=</code> works. The prefix becomes the action: drop, reject, deny or block count as blocks; accept, allow or pass as allowed; anything else as logged.</li></ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on:</p>
+        <pre>python3 fwscope-pull.py ssh you@server --sudo</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="openwrt" hidden>
@@ -354,6 +359,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li><code>logread</code> keeps only a small buffer. For history, send the log to a syslog server (System → System → Logging) and load that.</li>
           <li><code>logread</code> lines have no hostname: name the file after the router (<code>gl-ax1800.log</code>).</li>
         </ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on:</p>
+        <pre>python3 fwscope-pull.py openwrt root@192.168.1.1</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="opnsense" hidden>
@@ -370,6 +377,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>One file per day, a few hundred MB on a busy firewall. Remote-syslog copies and Live View API JSON work too.</li>
           <li>Rules and interfaces show as IDs until you drop a config backup: see <b>Optional extras</b> above.</li>
         </ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on:</p>
+        <pre>python3 fwscope-pull.py opnsense root@192.168.1.1 --days 2</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="windows" hidden>
@@ -386,6 +395,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <pre>auditpol /set /subcategory:"Filtering Platform Connection" /success:enable /failure:enable</pre>
           <pre>Get-WinEvent -FilterHashtable @{LogName='Security';Id=5152,5156,5157} -MaxEvents 200000 | % { $x=[xml]$_.ToXml(); $d=[ordered]@{EventID=$_.Id;TimeCreated=$_.TimeCreated.ToUniversalTime().ToString('o');Computer=$_.MachineName}; $x.Event.EventData.Data | % { $d[$_.Name]=$_.'#text' }; $d | ConvertTo-Json -Compress } | Set-Content -Encoding utf8 "$HOME\Desktop\$env:COMPUTERNAME-wfp.json"</pre>
         </details>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on (in an administrator prompt):</p>
+        <pre>python fwscope-pull.py local --programs</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="aws" hidden>
@@ -394,6 +405,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <h3>2. Grab the log</h3>
         <pre>aws s3 sync s3://YOUR-BUCKET/AWSLogs/ACCOUNT/vpcflowlogs/REGION/2026/11/07/ ./vpc/</pre>
         <ul><li>The <code>.log.gz</code> files as delivered (default or custom format), or a CloudWatch Logs export. ACCEPT and REJECT become the actions.</li></ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on:</p>
+        <pre>python3 fwscope-pull.py aws --bucket YOUR-BUCKET --account ACCOUNT --region REGION --days 2</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="azure" hidden>
@@ -402,6 +415,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <h3>2. Grab the log</h3>
         <pre>az storage blob download-batch -d ./azure -s insights-logs-flowlogflowevent --account-name YOUR_ACCOUNT</pre>
         <ul><li>The hourly <code>PT1H.json</code> blobs. NSG flow logs live in <code>insights-logs-networksecuritygroupflowevent</code>. Each flow counts once, with the NSG rule as the rule.</li></ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on:</p>
+        <pre>python3 fwscope-pull.py azure --storage-account YOUR_ACCOUNT --days 2</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="f2b" hidden>
@@ -411,6 +426,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>Ban, Unban, Found and "already banned" (F2B REPEAT) lines; the jail shows as the rule.</li>
           <li>Load it with your firewall or WAF logs: scanners get marked <b>fail2ban banned</b> or <b>not banned</b>, and <code>seen:f2b</code> filters to the ones it banned.</li>
         </ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on:</p>
+        <pre>python3 fwscope-pull.py ssh you@server --sudo</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="suricata" hidden>
@@ -419,6 +436,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <h3>2. Grab the log</h3>
         <pre>scp 'root@opnsense:/var/log/suricata/eve.json*' .</pre>
         <ul><li>Alert events from <code>eve.json</code> (the rest are skipped) or <code>fast.log</code>. The signature shows as the rule; IPS drops count as blocks; <code>seen:ids</code> filters to sources Suricata alerted on.</li></ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on:</p>
+        <pre>python3 fwscope-pull.py opnsense root@192.168.1.1 --suricata</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="modsec" hidden>
@@ -432,6 +451,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>Stopped requests show as <b>WAF BLOCK</b>, flagged ones as <b>WAF DETECT</b>. Attack types come from the OWASP Core Rule Set's rule numbers.</li>
           <li>Name a file after its server (<code>shop-web.log</code>). Load firewall logs too and addresses seen by both get marked <b>firewall + WAF</b> (<code>seen:both</code>).</li>
         </ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on:</p>
+        <pre>python3 fwscope-pull.py ssh you@web --sudo</pre>
       </div>
 
       <div class="fmt-panel" role="tabpanel" data-f="cloudflare" hidden>
@@ -442,6 +463,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>Or a Logpush job for the <code>firewall_events</code> dataset.</li>
           <li>Blocks, challenges, logged and skipped events show as <code>WAF BLOCK</code>, <code>WAF CHALLENGE</code>, <code>WAF DETECT</code> and <code>WAF ALLOW</code>. The API returns at most 10,000 events per query; how far back depends on your plan.</li>
         </ul>
+        <p class="pull">Or let <a href="https://github.com/magikh0e/fwscope/tree/main/scripts" target="_blank" rel="noopener">fwscope-pull.py</a> fetch it from the computer you run fwscope on, with no 10,000-event limit:</p>
+        <pre>CF_API_TOKEN=... python3 fwscope-pull.py cloudflare --zone ZONE_ID --since 2026-11-01</pre>
       </div>
       <p class="hint">More detail on every format is in the <a href="https://github.com/magikh0e/fwscope#readme" target="_blank" rel="noopener">README</a>.</p>
     </div>
@@ -981,10 +1004,19 @@ function wfHeader(line, ctx) {
   if (m[1] === 'Fields') ctx.wfFields = m[2].split(/\s+/);
   else if (m[1] === 'Host') ctx.wfHost = m[2];
 }
+// Host names from file names, for logs that don't carry one: "office-pc.log" is office-pc, a generic name like
+// "pfirewall.log" has none, and "web1-modsec_audit.log" (as fwscope-pull.py names what it collects) is web1.
+const fileStem = n => (n || '').replace(/(\.(log|json|txt|gz|old|\d+))+$/i, '');
+function hostFromFile(name, generic) {
+  const st = fileStem(name);
+  const g = `(?:${generic}|sample \\(generated\\)|pasted text)`;
+  if (!st || new RegExp(`^${g}$`, 'i').test(st)) return ''; // a generic name on its own
+  const m = new RegExp(`^(.+?)[-_]${g}$`, 'i').exec(st);
+  return m ? m[1] : st;
+}
 function wfHostName(ctx) {
   if (ctx.wfHost) return ctx.wfHost;
-  const stem = (ctx.name || '').replace(/(\.(log|old|txt|gz))+$/i, '');
-  return !stem || /^pfirewall$/i.test(stem) ? 'windows' : stem;
+  return hostFromFile(ctx.name, 'pfirewall') || 'windows';
 }
 function wfLine(line, ctx) {
   D.kinds.win = 1;
@@ -1105,8 +1137,7 @@ function modsecFields(s) {
   return f;
 }
 function wafHostName(ctx) {
-  const stem = (ctx.name || '').replace(/(\.(log|json|txt|gz|\d+))+$/i, '');
-  return !stem || /^(modsec[_-]?audit|audit|error|error_log|modsec(urity)?|sample \(generated\)|pasted text)$/i.test(stem) ? 'waf' : stem;
+  return hostFromFile(ctx.name, 'modsec[_-]?audit|audit|error|error_log|modsec(?:urity)?(?:-errors)?') || 'waf';
 }
 const headerOf = (h, name) => { if (!h) return ''; const k = Object.keys(h).find(x => x.toLowerCase() === name); return k ? String(h[k]) : ''; };
 const MON3 = s => MON[s.slice(0, 1).toUpperCase() + s.slice(1, 3).toLowerCase()];
@@ -1536,11 +1567,11 @@ function fail2banLine(line, ctx) {
   if (isDup(ts, line.slice(19), ctx)) return true;
   // "already banned": seen again after its ban, so the ban isn't keeping it out (behind a proxy or CDN, say)
   const what = m[11] ? 'F2B REPEAT' : m[9] === 'Found' ? 'F2B FOUND' : m[9] === 'Unban' ? 'F2B UNBAN' : 'F2B BAN';
-  addRow({ ts, host: '', act: what, proto: '?', src: m[10] || m[11], rule: m[8] }, ctx);
+  addRow({ ts, host: hostFromFile(ctx.name, 'fail2ban'), act: what, proto: '?', src: m[10] || m[11], rule: m[8] }, ctx);
   return true;
 }
-const owHostName = name => { const st = (name || '').replace(/(\.(log|txt|gz|\d+))+$/i, ''); return !st || /^(logread|messages|system|syslog|kern|kernel|pasted text|sample \(generated\))$/i.test(st) ? 'openwrt' : st; };
-const idsHostName = name => { const st = (name || '').replace(/(\.(log|json|txt|gz|\d+))+$/i, ''); return /^(eve|fast|alerts?|suricata|pasted text|sample \(generated\))$/i.test(st) ? '' : st; };
+const owHostName = name => hostFromFile(name, 'logread|messages|system|syslog|kern|kernel') || 'openwrt';
+const idsHostName = name => hostFromFile(name, 'eve|fast|alerts?|suricata');
 function newCtx(ref) { const r = ref || Date.now(); return { ref: r, year: new Date(r).getFullYear(), keys: new Float64Array(4096), kn: 0, lo: Infinity, hi: -Infinity, nan: false, pk: 0, skipped0: D.skipped }; }
 function closeCtx(ctx) { wafFlush(ctx); if (ctx.kn) D.prior.push({ keys: ctx.keys.slice(0, ctx.kn), lo: ctx.lo, hi: ctx.hi, nan: ctx.nan, set: null }); }
 
@@ -1783,7 +1814,7 @@ function ipClass(s) { // 1 private/local, 2 multicast, 4 broadcast-ish, 8 v6
 function finish() {
   $('#progress').style.display = 'none';
   if (!D || !D.n) {
-    alert(D && D.lines ? 'Found firewall or WAF log lines but could not parse them.' : 'No firewall or WAF log lines found. Expected UFW or other netfilter lines ("[UFW BLOCK] ...", nftables or iptables log prefixes), OPNsense/pfSense filterlog lines, a Windows Firewall pfirewall.log, a fail2ban log, ModSecurity audit or error logs, or Cloudflare firewall events.');
+    alert(D && D.lines ? 'Found firewall, WAF or IDS log lines but could not parse them.' : 'No firewall, WAF or IDS log lines found. Expected UFW, nftables, iptables or OpenWrt kernel lines ("[UFW BLOCK] ...", "drop wan in: ..."), OPNsense/pfSense filterlog lines, a Windows Firewall pfirewall.log, AWS VPC or Azure flow logs, a fail2ban log, Suricata eve.json or fast.log, ModSecurity audit or error logs, or Cloudflare firewall events. The "Get your logs" tabs below show where each one lives.');
     if (D && !D.n) D = null;
     return;
   }
@@ -4312,7 +4343,26 @@ async function filesFromEntries(entries) {
   const tz = q.get('tz');
   if (tz && [...$('#optTz').options].some(o => o.value === tz)) { LOAD.tz = tz; $('#optTz').value = tz; }
   if (q.has('demo')) { resetStore(); D.demoGeo = true; loadText('sample (generated)', makeSample()); }
+  if (q.has('pull')) pullFromHelper(q.get('pull'));
 })();
+// Opened by fwscope-pull's helper page (scripts/fwscope-pull.py gui), which serves this page from 127.0.0.1:
+// fetch the files that pull wrote from the same local server and load them, so there's nothing to drag in.
+async function pullFromHelper(job) {
+  if (!/^[0-9a-f]{12}$/.test(job || '')) return;
+  try {
+    progress('Fetching the pulled logs…', null);
+    const r = await fetch(`/api/job/${job}/files`, { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(r.status === 403 ? 'the helper did not recognise this browser; open fwscope from its page' : 'HTTP ' + r.status);
+    const list = (await r.json()).files || [], files = [];
+    for (const f of list) {
+      if (!/^\/api\/job\/[0-9a-f]{12}\/file\/\d+$/.test(f.url)) continue; // only the helper's own file links
+      const b = await fetch(f.url, { credentials: 'same-origin' });
+      if (b.ok) files.push(new File([await b.blob()], String(f.name), { lastModified: +f.mtime || Date.now() }));
+    }
+    history.replaceState(null, '', location.pathname); // a reload shouldn't fetch them again
+    if (files.length) await loadFiles(files); else { $('#progress').style.display = 'none'; alert('That pull has no files to load.'); }
+  } catch (e) { $('#progress').style.display = 'none'; alert('Could not fetch the pulled logs from fwscope-pull: ' + e.message); }
+}
 </script>
 </body>
 </html>

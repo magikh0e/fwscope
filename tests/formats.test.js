@@ -180,9 +180,9 @@ test('Suricata eve.json: alerts only, signature as the rule, blocked in IPS mode
     'Nov  7 10:00:03 opnsense suricata[4242]: {"timestamp":"2026-11-07T10:00:03.000000+0000","flow_id":7,"event_type":"alert","src_ip":"198.51.100.9","src_port":5555,"dest_ip":"192.0.2.1","dest_port":3389,"proto":"TCP","alert":{"action":"allowed","signature_id":2023753,"signature":"ET SCAN MS Terminal Server Traffic on Non-standard Port"}}',
   ].join('\n'));
   assert.deepEqual(rows.map(r => [r.act, r.group, r.src, r.dpt, r.rule, r.host]), [
-    ['IDS ALERT', 3, '203.0.113.5', 22, 'sid:2001219', 'opnsense-eve'],
-    ['IDS DROP', 0, '2001:db8::7', -1, 'sid:2100366', 'opnsense-eve'],
-    ['IDS ALERT', 3, '198.51.100.9', 3389, 'sid:2023753', 'opnsense-eve']]);
+    ['IDS ALERT', 3, '203.0.113.5', 22, 'sid:2001219', 'opnsense'],
+    ['IDS DROP', 0, '2001:db8::7', -1, 'sid:2100366', 'opnsense'],
+    ['IDS ALERT', 3, '198.51.100.9', 3389, 'sid:2023753', 'opnsense']]);
   assert.equal(rows[0].ts, Date.UTC(2026, 10, 7, 10, 0, 0, 123));
   assert.equal(rows[1].ts, Date.UTC(2026, 10, 7, 20, 0, 1));
   assert.equal(rows[1].proto, 'ICMPv6'); assert.equal(rows[0].iin, 'igb0');

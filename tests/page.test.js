@@ -278,3 +278,20 @@ test('start screen: one format\'s steps at a time, and the open menu', () => {
   assert.equal(p.g('$("#openMenu").hidden'), true);
   assert.equal(p.g('$("#pasteDlg").open'), true);
 });
+
+test('host names from file names, including the <host>-<log> names fwscope-pull.py writes', () => {
+  const p = openPage();
+  const h = (fn, name) => p.g(`${fn}({ name: ${JSON.stringify(name)} })`);
+  assert.equal(h('wafHostName', 'modsec_audit.log'), 'waf');
+  assert.equal(h('wafHostName', 'web1-modsec_audit.log.2.gz'), 'web1');
+  assert.equal(h('wafHostName', 'web1-modsecurity-errors.log'), 'web1');
+  assert.equal(h('wafHostName', 'shop-web.log'), 'shop-web');
+  assert.equal(h('wfHostName', 'pfirewall.log.old'), 'windows');
+  assert.equal(h('wfHostName', 'DESKTOP-1-pfirewall.log'), 'DESKTOP-1');
+  assert.equal(p.g('idsHostName("eve.json.1")'), '');
+  assert.equal(p.g('idsHostName("192.168.1.1-eve.json")'), '192.168.1.1');
+  assert.equal(p.g('owHostName("logread.txt")'), 'openwrt');
+  assert.equal(p.g('owHostName("gl-ax1800.log")'), 'gl-ax1800');
+  assert.equal(p.g('hostFromFile("web1-fail2ban.log.1", "fail2ban")'), 'web1');
+  assert.equal(p.g('hostFromFile("fail2ban.log", "fail2ban")'), '');
+});

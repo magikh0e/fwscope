@@ -67,6 +67,41 @@ fail2ban's own log (`/var/log/fail2ban.log`) shows what it found, banned and unb
 - **Block suggestions** say the same in their reasons
 - the **Sources** list notes **banned by fail2ban**, and `seen:f2b` filters to the sources it banned (`-seen:f2b` to the rest)
 
+## Pulling logs with fwscope-pull.py
+
+<p align="center"><img src="assets/fwscope-pull-badge.webp" alt="fwscope-pull: logs from servers, routers and clouds flowing into one folder" width="220"></p>
+
+[`scripts/fwscope-pull.py`](scripts/fwscope-pull.py) gathers logs onto the computer you run fwscope on, so you don't have to remember where each system keeps them. It's one Python 3.9+ file with no dependencies, and it works on Windows, macOS and Linux. Remote machines are reached over SSH with the `ssh` client your system already has (Windows 10 and later include it), so nothing gets installed on your servers or routers and they don't need Python.
+
+| Command | What it pulls |
+|---|---|
+| `python3 fwscope-pull.py local` | This machine: UFW / netfilter lines, fail2ban, Suricata, ModSecurity (Linux, run with `sudo`), or `pfirewall.log` and with `--programs` the Security-log events (Windows, run as administrator) |
+| `python3 fwscope-pull.py ssh you@server --sudo` | The same from a Linux server. `--sudo` asks once for the password and sends it to sudo on the server; it never goes on a command line |
+| `python3 fwscope-pull.py opnsense root@192.168.1.1 --days 2` | OPNsense or pfSense filter logs (add `--suricata` for `eve.json`) |
+| `python3 fwscope-pull.py openwrt root@192.168.1.1` | OpenWrt's `logread`, saved under the router's hostname |
+| `python3 fwscope-pull.py cloudflare --zone ZONE_ID --since 2026-11-01` | Cloudflare firewall events. The API token comes from the `CF_API_TOKEN` environment variable, and the script pages past the API's 10,000-events-per-request limit |
+| `python3 fwscope-pull.py aws --bucket B --account A --region R` | AWS VPC Flow Logs for the last days, through the `aws` tool |
+| `python3 fwscope-pull.py azure --storage-account NAME` | Azure VNet (or `--container insights-logs-networksecuritygroupflowevent` for NSG) flow logs, through the `az` tool |
+
+Every command takes `--days N` and `-o FOLDER`, and prints what it collected and anything it couldn't read. Files are named `<host>-<log>` (for example `web1-modsec_audit.log`), and fwscope shows `web1` as the host. When it's done, drop the folder on fwscope.
+
+### The helper page
+
+Rather type into a form than a terminal? Run
+
+```bash
+python3 fwscope-pull.py gui
+```
+
+It opens a page in your browser with a tab for each source. Fill in the host (or zone, bucket, storage account), press **Pull logs**, watch its output, then press **Open in fwscope**: fwscope opens with the logs already loaded, no folder to drag. Stop it with Ctrl+C in its terminal, or **quit it here** on the page.
+
+- It listens on this computer only (`127.0.0.1`, port 8765 by default; `--port` to change it). The address it opens carries a random key that becomes a cookie, every request needs it, and requests for any other host name are refused, so no website you visit can drive it.
+- Each pull runs the same command line as above, with the form's values checked field by field. Passwords and tokens go to that one run through its environment, and aren't saved (the other fields are remembered in the browser for next time).
+- It can't answer prompts, so SSH needs key login and the host must be known already: connect once with `ssh` in a terminal first. Pick a specific key in the **SSH key file** field (on the command line: `-i ~/.ssh/my_key`); only that key is tried. A key with a passphrase needs to be loaded into `ssh-agent` first. To read root-only logs on this computer, start the helper with `sudo` (Linux) or from an administrator prompt (Windows).
+- **Open in fwscope** needs fwscope's `index.html` next to the `scripts` folder (as in a clone of this repository), or `--fwscope PATH`. Without it, drop the folder on fwscope as usual. Because the port stays the same, fwscope's saved GeoIP databases and settings carry over between runs.
+
+The script only reads: it never changes a firewall, server or cloud setting. Download it and read it before running it, rather than piping it from the internet into a shell.
+
 ## OPNsense / pfSense
 
 It also reads `filterlog` lines, in any of these forms:

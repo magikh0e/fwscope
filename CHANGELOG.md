@@ -2,6 +2,15 @@
 
 What changed in each release of fwscope. The newest is at the top. Version numbers follow [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+- **fwscope-pull.py:** a Python script (no dependencies; Windows, macOS, Linux) that gathers logs onto the computer you run fwscope on: this machine, Linux servers, OPNsense / pfSense and OpenWrt over SSH, Cloudflare events past the 10,000-per-request limit, and AWS / Azure flow logs through their command-line tools. Each format's tab on the start screen shows its command.
+- **fwscope-pull.py gui:** a page in your browser to run pulls and open the results straight in fwscope, without the command line or dragging a folder. It listens on this computer only and needs a random key.
+
+### Changed
+- Host names come from file names like `web1-modsec_audit.log` (as the script names them): the host is `web1`. fail2ban logs now take their host from the file name too.
+
 ## 1.3.0 (2026-11-08)
 
 ### Added
