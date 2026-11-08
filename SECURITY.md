@@ -1,6 +1,6 @@
 # Security
 
-fwscope runs entirely in your browser. Logs, GeoIP databases and firewall configs are read locally and never uploaded. The page makes no network requests of its own; the only outside links (AbuseIPDB, RDAP) open when you click them.
+fwscope runs entirely in your browser. Logs, GeoIP databases and firewall configs are read locally and never uploaded. The page makes no network requests of its own, with one opt-in exception: if you turn on **Hostnames**, the public addresses on screen are sent to the DNS-over-HTTPS service you pick (Cloudflare or Google) for reverse DNS. It's off by default and asks before it starts. The only other outside links (AbuseIPDB, RDAP) open when you click them.
 
 ## Reporting a problem
 

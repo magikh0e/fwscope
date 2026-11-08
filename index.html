@@ -203,6 +203,8 @@ tr:hover .cp, .cp:focus-visible { opacity: 1; }
 #wiDetail h3 b { color: var(--ink); }
 #wiDetail section { margin-bottom: 12px; }
 .why { color: var(--muted); font-size: 11.5px; margin-left: 6px; font-weight: 400; }
+.rdns { color: var(--muted); font-family: system-ui, sans-serif; font-size: 11px; font-weight: 400; }
+.rdns.unconf { font-style: italic; }
 .newnote { background: var(--surface-2); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
 
 /* map */
@@ -260,7 +262,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <p>Drop several at once to merge them. Duplicates across files are skipped (UFW writes the same line to ufw.log, kern.log and syslog).</p>
       <p>For a world map and network owners, drop a GeoIP database too (<code>.mmdb</code> or <code>.mmdb.gz</code>). <span id="geoStatusEmpty"></span></p>
       <p>OPNsense / pfSense: drop a config backup (<code>config-*.xml</code>) and/or <code>rule_ids.json</code> to show interface and rule names. <span id="namesStatusEmpty"></span></p>
-      <p style="color:var(--muted)">Everything is parsed in this browser tab. Nothing is uploaded anywhere.</p>
+      <p style="color:var(--muted)">Everything is parsed in this browser tab. Nothing is uploaded anywhere, unless you turn on the optional hostname lookups.</p>
     </div>
     <div class="howto">
       <div class="card">
@@ -342,6 +344,9 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <input type="text" id="q" placeholder="filter: src:1.2.3.0/24 dpt:22,23 -proto:udp in:eth0 host:web1" spellcheck="false" autocomplete="off">
         <label class="tog"><input type="checkbox" id="hideNoise"> Hide broadcast/multicast</label>
         <label class="tog"><input type="checkbox" id="publicOnly"> Public sources only</label>
+        <label class="tog" title="Look up hostnames (reverse DNS) for the public addresses on screen. Off by default: this sends those addresses to the DNS-over-HTTPS service you pick.">Hostnames
+          <select id="rdnsSel"><option value="">off</option><option value="cf">via Cloudflare</option><option value="google">via Google</option></select></label>
+        <span id="rdnsStatus" class="sub"></span><button id="rdnsAll" hidden title="Look up hostnames for every source in the current view, not just the ones on screen, e.g. before filtering with rdns:">Look up all sources</button>
         <button id="btnReset" title="Clear the filter, time range, action toggles and checkboxes">Reset view</button>
       </div>
       <div id="qerr" class="qerr"></div>
@@ -1363,7 +1368,7 @@ function numMatcher(v) {
 // precompute a lookup table over an interned string list
 const table = (intern, fn) => Uint8Array.from(intern.list, s => fn(s) ? 1 : 0);
 
-const FIELDS = ['src','dst','ip','spt','dpt','port','proto','in','out','iface','host','mac','act','action','flag','type','ttl','len','rule','cc','country','asn','org','site','path','uri','method','status','wrule','attack','sev','ua','seen','score'];
+const FIELDS = ['src','dst','ip','spt','dpt','port','proto','in','out','iface','host','mac','act','action','flag','type','ttl','len','rule','cc','country','asn','org','site','path','uri','method','status','wrule','attack','sev','ua','seen','score','rdns'];
 function compileQuery(q) {
   const preds = [];
   const c = D.c;
@@ -1401,6 +1406,18 @@ function compileQuery(q) {
       }
       case 'rule': { const m = strMatcher(v), l = v.toLowerCase(), words = l.replace(/_/g, ' '); const T = Uint8Array.from(D.rule.list, s => s && (m(s) || s.toLowerCase().startsWith(l) || (ruleLabel(s) || '').toLowerCase().includes(words)) ? 1 : 0); p = i => T[c.rule[i]]; break; }
       case 'host': { const T = table(D.host, strMatcher(v)); p = i => T[c.host[i]]; break; }
+      case 'rdns': {
+        // sources whose reverse DNS name matches; only addresses that have been looked up can match
+        if (!RDNS.provider && !RDNS.cache.size) throw new Error('rdns: needs Hostnames turned on (filter bar)');
+        const l = v.toLowerCase(), want = { confirmed: 1, unconfirmed: 2, none: 3 }[l], m = want ? null : v.includes('*') ? strMatcher(v) : (x => x.endsWith(l) || x === l.replace(/^\./, ''));
+        const T = Uint8Array.from(D.ip.list, ip => {
+          const r = RDNS.cache.get(ip); if (!r) return 0;
+          if (want === 1) return r.name && r.ok ? 1 : 0; if (want === 2) return r.name && !r.ok ? 1 : 0; if (want === 3) return r.name ? 0 : 1;
+          return r.name && m(r.name.toLowerCase()) ? 1 : 0;
+        });
+        p = i => T[c.src[i]];
+        break;
+      }
       case 'seen': {
         const want = { fw: 1, firewall: 1, waf: 2, both: 3 }[v.toLowerCase()];
         if (!want) throw new Error('seen: takes fw, waf or both');
@@ -1659,7 +1676,7 @@ const groupRows = (counts, total) => {
 /* ============================================================ render: tiles */
 function renderAll() {
   hideTip(); syncPresets();
-  namesStatus(); renderTiles(); renderTimeline(); renderMap(); renderWhatIf(); renderTuning(); renderNew(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
+  namesStatus(); rdnsStatus(); renderTiles(); renderTimeline(); renderMap(); renderWhatIf(); renderTuning(); renderNew(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
   const f = D.files.map(f => `${f.name} (${fmtN(f.events)}${f.partial ? ', stopped partway' : ''})`).join(', ');
   $('#foot').textContent = `${fmtN(D.n)} events from ${D.files.length} source${D.files.length > 1 ? 's' : ''}: ${f}.` +
     (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') +
@@ -1914,6 +1931,119 @@ function namesStatus() {
   box.append(b);
 }
 
+/* ============================================================ hostnames (reverse DNS), opt-in
+   A browser can't send DNS queries itself, so lookups go to a DNS-over-HTTPS resolver the viewer picks.
+   This is the one feature that sends data off the machine: only public addresses that are on screen, only
+   when switched on. Each PTR name is forward-confirmed (its A/AAAA records must include the address), so a
+   PTR an attacker set to look like googlebot.com shows as unconfirmed. Results are cached for a week. */
+const RDNS_PROVIDERS = {
+  cf: { name: 'Cloudflare (1.1.1.1)', url: (n, t) => `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(n)}&type=${t}`, headers: { accept: 'application/dns-json' } },
+  google: { name: 'Google (8.8.8.8)', url: (n, t) => `https://dns.google/resolve?name=${encodeURIComponent(n)}&type=${t}`, headers: {} },
+};
+const RDNS = { provider: '', cache: new Map(), queue: [], queued: new Set(), active: 0, cap: 500 };
+const RDNS_TTL = 7 * 864e5, RDNS_MAX = 20000, RDNS_PARALLEL = 4;
+try {
+  RDNS.provider = localStorage.getItem('fwscope-rdns') || '';
+  const saved = JSON.parse(localStorage.getItem('fwscope-rdns-cache') || '[]'), now = Date.now();
+  for (const [ip, v] of saved) if (now - v.t < RDNS_TTL) RDNS.cache.set(ip, v);
+} catch {}
+if (!RDNS_PROVIDERS[RDNS.provider]) RDNS.provider = '';
+let rdnsSaveTimer = 0;
+function rdnsSave() {
+  clearTimeout(rdnsSaveTimer);
+  rdnsSaveTimer = setTimeout(() => { try { localStorage.setItem('fwscope-rdns-cache', JSON.stringify([...RDNS.cache].slice(-RDNS_MAX))); } catch {} }, 1500);
+}
+function ptrName(ip) {
+  if (ip.includes(':')) { const b = ipBits(ip); if (!b) return null; let h = ''; for (let k = 0; k < 128; k += 4) h += parseInt(b.slice(k, k + 4), 2).toString(16); return [...h].reverse().join('.') + '.ip6.arpa'; }
+  const p = ip.split('.'); return p.length === 4 ? p.reverse().join('.') + '.in-addr.arpa' : null;
+}
+async function doh(name, type) {
+  const p = RDNS_PROVIDERS[RDNS.provider];
+  const r = await fetch(p.url(name, type), { headers: p.headers, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function rdnsLookup(ip) {
+  const n = ptrName(ip); if (!n) return { t: Date.now(), name: '', ok: false };
+  const j = await doh(n, 'PTR');
+  const ptr = (j.Answer || []).find(a => a.type === 12);
+  if (!ptr) return { t: Date.now(), name: '', ok: false, none: true };
+  const name = String(ptr.data).replace(/\.$/, '');
+  // forward-confirm: the name has to point back at this address
+  let ok = false;
+  try {
+    const f = await doh(name, ip.includes(':') ? 'AAAA' : 'A');
+    const want = ip.includes(':') ? ipBits(ip) : ip;
+    ok = (f.Answer || []).some(a => (a.type === 1 || a.type === 28) && (ip.includes(':') ? ipBits(String(a.data)) === want : String(a.data) === want));
+  } catch {}
+  return { t: Date.now(), name, ok };
+}
+function rdnsPump() {
+  while (RDNS.active < RDNS_PARALLEL && RDNS.queue.length) {
+    const ip = RDNS.queue.shift(); RDNS.active++;
+    rdnsLookup(ip).then(v => { RDNS.cache.set(ip, v); rdnsSave(); rdnsPaint(ip); })
+      .catch(() => { RDNS.cache.set(ip, { t: Date.now() - RDNS_TTL + 6e5, name: '', ok: false, err: true }); }) // retry errors after 10 minutes
+      .finally(() => {
+        RDNS.active--; RDNS.queued.delete(ip); rdnsStatus(); rdnsPump();
+        if (!RDNS.active && !RDNS.queue.length && D && D.n && /(^|\s)-?rdns:/.test(F.q)) setQuery(F.q, true);
+      });
+  }
+  rdnsStatus();
+}
+function rdnsStatus() {
+  const n = RDNS.queue.length + RDNS.active, el2 = $('#rdnsStatus');
+  if (el2) el2.textContent = RDNS.provider && n ? `resolving ${fmtN(n)}…` : '';
+  const b = $('#rdnsAll');
+  if (b) {
+    const todo = RDNS.provider && D && D.n ? rdnsTodo().length : 0;
+    b.hidden = !todo || n > 0; b.textContent = `Look up all ${fmtN(todo)} sources`;
+  }
+}
+// public sources in the current view that haven't been looked up yet
+function rdnsTodo() {
+  const seen = new Uint8Array(D.ip.list.length), out = [];
+  for (const i of SEL) { const s = D.c.src[i]; if (seen[s]) continue; seen[s] = 1; const ip = D.ip.list[s]; if (ip && !(D.ipc[s] & 7) && !RDNS.cache.has(ip) && !RDNS.queued.has(ip)) out.push(ip); }
+  return out;
+}
+const rdnsSpan = v => {
+  const sp = el('small', 'rdns' + (v.ok ? '' : ' unconf'), v.name + (v.ok ? '' : ' ?'));
+  sp.title = v.ok ? `${v.name}: reverse DNS, confirmed (the name points back to this address)` : `${v.name}: reverse DNS, NOT confirmed (the name doesn't point back to this address, so it may be made up)`;
+  return sp;
+};
+function rdnsPaint(ip) {
+  const v = RDNS.cache.get(ip); if (!v || !v.name) return;
+  for (const e of document.querySelectorAll(`[data-ip="${CSS.escape(ip)}"]`)) if (!e.querySelector('.rdns')) e.append(' ', rdnsSpan(v));
+}
+// call on any element that shows an address: adds the hostname now if known, otherwise queues a lookup.
+// Only sources are looked up (lookup=false for destinations, which are usually your own addresses).
+function rdnsTag(node, ip, lookup = true) {
+  if (!ip) return;
+  node.dataset.ip = ip;
+  if (!RDNS.provider) return;
+  const id = D && D.ip.map.get(ip);
+  if (id === undefined || (D.ipc[id] & 7)) return; // never send private, LAN, multicast or broadcast addresses
+  const v = RDNS.cache.get(ip);
+  if (v) { if (v.name && !node.querySelector('.rdns')) node.append(' ', rdnsSpan(v)); return; }
+  if (!lookup || RDNS.queued.has(ip) || RDNS.queue.length > RDNS.cap) return;
+  RDNS.queued.add(ip); RDNS.queue.push(ip);
+  queueMicrotask(rdnsPump);
+}
+$('#rdnsAll').onclick = () => {
+  const todo = rdnsTodo(), cap = 2000;
+  if (todo.length > 200 && !confirm(`Look up ${fmtN(Math.min(todo.length, cap))} source addresses${todo.length > cap ? ` (the first ${fmtN(cap)} of ${fmtN(todo.length)})` : ''} via ${RDNS_PROVIDERS[RDNS.provider].name}? Two queries each, about ${fmtN(Math.ceil(Math.min(todo.length, cap) / RDNS_PARALLEL / 3))} seconds.`)) return;
+  RDNS.cap = cap;
+  for (const ip of todo.slice(0, cap)) { RDNS.queued.add(ip); RDNS.queue.push(ip); }
+  rdnsPump();
+};
+const rdnsName = ip => { const v = RDNS.cache.get(ip); return v && v.name ? v.name + (v.ok ? '' : ' (unconfirmed)') : ''; };
+$('#rdnsSel').value = RDNS.provider;
+$('#rdnsSel').onchange = e => {
+  const v = e.target.value;
+  if (v && !RDNS.provider && !confirm(`Look up hostnames for the public addresses on screen?\n\nThis sends those addresses to ${RDNS_PROVIDERS[v].name}'s DNS-over-HTTPS service. Everything else fwscope does stays in this browser. Private and LAN addresses are never sent. Results are kept in this browser for a week.\n\nThe reverse DNS servers for each address (often run by the attacker's network) see the lookup come from ${v === 'cf' ? 'Cloudflare' : 'Google'}, not from you.`)) { e.target.value = ''; return; }
+  RDNS.provider = v; try { localStorage.setItem('fwscope-rdns', v); } catch {}
+  if (D && D.n) renderAll();
+};
+
 /* ============================================================ render: ranked lists */
 function subnetOf(ip) {
   if (ip.includes(':')) { const b = ipBits(ip); if (!b) return ip; const g = []; for (let i = 0; i < 4; i++) g.push(parseInt(b.slice(i * 16, i * 16 + 16), 2).toString(16)); return g.join(':') + '::/64'; }
@@ -1985,6 +2115,7 @@ function renderRank(id) {
     const sub = dim.sub && dim.sub(k); if (sub) { lbl.append(' '); lbl.append(el('small', null, sub)); }
     if (dim.ip) {
       const ip = D.ip.list[k];
+      rdnsTag(lbl, ip, F['dim' + id] !== 'dst');
       if (ip && !(D.ipc[k] & 7)) { const a2 = el('a', 'ext', '↗'); a2.href = 'https://www.abuseipdb.com/check/' + encodeURIComponent(ip); a2.target = '_blank'; a2.rel = 'noopener noreferrer'; a2.title = 'Look up on AbuseIPDB (opens a new tab)'; a2.onclick = e => e.stopPropagation(); lbl.append(a2); }
     }
     lbl.title = dim.name(k);
@@ -2162,7 +2293,7 @@ function renderWhatIf() {
     if (!g.m.size) continue;
     const sec = el('section'); const h = el('h3', null, g.title + ' '); h.append(el('b', null, fmtN([...g.m.values()].reduce((a, b) => a + b, 0)))); sec.append(h);
     for (const [src, n] of topOf(g.m).slice(0, 4)) {
-      const row = el('div', 'newrow'); const lbl = el('span', 'nl', D.ip.list[src]);
+      const row = el('div', 'newrow'); const lbl = el('span', 'nl', D.ip.list[src]); rdnsTag(lbl, D.ip.list[src]);
       const ua = modeOf(srcUa.get(src) || new Map());
       if (D.ua.list[ua]) lbl.append(' ', el('small', null, D.ua.list[ua].slice(0, 50)));
       row.append(lbl, el('span', 'nc', fmtN(n)));
@@ -2313,6 +2444,7 @@ function renderNew() {
     for (const k of ks.slice(0, NEW_SHOW)) {
       const row = el('div', 'newrow'), lbl = el('span', 'nl', col.name(k)), sub = col.sub(k);
       if (sub) { lbl.append(' '); lbl.append(el('small', null, sub)); }
+      if (col.title === 'Sources') rdnsTag(lbl, D.ip.list[k]);
       row.append(lbl, el('span', 'nc', fmtN(col.T.n[k])));
       const newTip = e => showTip(e, col.name(k), [{ value: fmtN(col.T.n[k]), label: 'events in window' }, { value: fmtTime(col.T.first[k]), label: 'first seen' }]);
       row.addEventListener('pointermove', newTip);
@@ -2441,7 +2573,7 @@ function renderScans() {
       const [top, { n }] = [...s.ports].sort((a, b) => b[1].n - a[1].n)[0];
       sample = pat === 'host sweep' ? `${top}${svcName(top) ? ' ' + svcName(top) : ''} → ${s.dsts.size >= 64 ? '64+' : s.dsts.size} addresses` : `${top}${svcName(top) ? ' ' + svcName(top) : ''} ×${fmtN(n)}`;
     } else sample = ports.slice(0, 6).join(', ') + (ports.length > 6 ? ', …' : '');
-    tr.append(el('td', 'mono', D.ip.list[src]));
+    const std = el('td', 'mono', D.ip.list[src]); rdnsTag(std, D.ip.list[src]); tr.append(std);
     if (D.geo) { const x = D.ipCC[src], a = D.ipAS[src]; const net = [x >= 0 ? D.cc.list[x] : '', a >= 0 ? asnLabel(a) : ''].filter(Boolean).join(' · '); const d = el('td', null, net); d.style.cssText = 'max-width:180px;overflow:hidden;text-overflow:ellipsis'; d.title = net; tr.append(d); }
     const pd = el('td'); const pb = el('span', 'pat', pat); pb.title = PATTERNS[pat]; pd.append(pb); tr.append(pd);
     // for scans, "over" is how long the sweep itself took; the full first-to-last span is on hover
@@ -2583,7 +2715,7 @@ function renderEvents() {
       case 'host': td(D.host.list[c.host[i]], null, D.host.list[c.host[i]] ? 'host:' + D.host.list[c.host[i]] : null); break;
       case 'in': case 'out': { const dev = D.iface.list[col.id === 'in' ? c.iin[i] : c.iout[i]]; const d = td(ifLabel(dev) || dev, ifLabel(dev) ? null : 'mono', dev ? col.id + ':' + dev : null); if (ifLabel(dev)) d.title = dev; break; }
       case 'proto': td(proto, null, 'proto:' + proto); break;
-      case 'src': case 'dst': { const ip = D.ip.list[col.id === 'src' ? c.src[i] : c.dst[i]]; td(ip, 'mono', ip ? col.id + ':' + ip : null); break; }
+      case 'src': case 'dst': { const ip = D.ip.list[col.id === 'src' ? c.src[i] : c.dst[i]]; const d = td(ip, 'mono', ip ? col.id + ':' + ip : null); rdnsTag(d, ip, col.id === 'src'); break; }
       case 'cc': { const x = D.ipCC[c.src[i]], cc = x >= 0 ? D.cc.list[x] : ''; const d = td(cc, null, cc ? 'cc:' + cc : null); if (cc) d.title = ccName(cc) + (D.ipAS[c.src[i]] >= 0 ? ', ' + D.asn.list[D.ipAS[c.src[i]]] + ' ' + (D.asnOrg[D.ipAS[c.src[i]]] || '') : ''); break; }
       case 'spt': td(c.spt[i] >= 0 ? String(c.spt[i]) : '', null, c.spt[i] >= 0 ? 'spt:' + c.spt[i] : null); break;
       case 'dpt': { const dp = c.dpt[i]; td(dp >= 0 ? String(dp) + (svcName(dp) ? ' ' + svcName(dp) : '') : '', null, dp >= 0 ? 'dpt:' + dp : null); break; }
@@ -2630,13 +2762,14 @@ function download(name, text, type = 'text/plain') {
 }
 const csvCell = s => /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 $('#btnCsv').onclick = () => {
-  const c = D.c, lines = ['time_iso,action,host,in,out,proto,src,spt,dst,dpt,len,ttl,flags,icmp_type,icmp_code,src_mac' + (D.geo ? ',src_country,src_asn,src_org' : '')];
+  const c = D.c, withRdns = RDNS.cache.size > 0, lines = ['time_iso,action,host,in,out,proto,src,spt,dst,dpt,len,ttl,flags,icmp_type,icmp_code,src_mac' + (D.geo ? ',src_country,src_asn,src_org' : '') + (withRdns ? ',src_rdns' : '')];
   for (let k = 0; k < SEL.length; k++) {
     const i = SEL[k], t = c.ts[i];
     lines.push([t === t ? new Date(t).toISOString() : '', D.act.list[c.act[i]], D.host.list[c.host[i]], D.iface.list[c.iin[i]], D.iface.list[c.iout[i]], D.proto.list[c.proto[i]],
       D.ip.list[c.src[i]], c.spt[i] >= 0 ? c.spt[i] : '', D.ip.list[c.dst[i]], c.dpt[i] >= 0 ? c.dpt[i] : '', c.len[i] >= 0 ? c.len[i] : '', c.ttl[i] >= 0 ? c.ttl[i] : '',
       flagStr(c.flags[i]), c.itype[i] >= 0 ? c.itype[i] : '', c.icode[i] >= 0 ? c.icode[i] : '', D.mac.list[c.mac[i]],
-      ...(D.geo ? [D.ipCC[c.src[i]] >= 0 ? D.cc.list[D.ipCC[c.src[i]]] : '', D.ipAS[c.src[i]] >= 0 ? D.asnNum[D.ipAS[c.src[i]]] : '', D.ipAS[c.src[i]] >= 0 ? D.asnOrg[D.ipAS[c.src[i]]] || '' : ''] : [])].map(v => csvCell(String(v))).join(','));
+      ...(D.geo ? [D.ipCC[c.src[i]] >= 0 ? D.cc.list[D.ipCC[c.src[i]]] : '', D.ipAS[c.src[i]] >= 0 ? D.asnNum[D.ipAS[c.src[i]]] : '', D.ipAS[c.src[i]] >= 0 ? D.asnOrg[D.ipAS[c.src[i]]] || '' : ''] : []),
+      ...(withRdns ? [rdnsName(D.ip.list[c.src[i]])] : [])].map(v => csvCell(String(v))).join(','));
   }
   download('ufw-events.csv', lines.join('\n') + '\n', 'text/csv');
 };
@@ -2743,6 +2876,7 @@ function abuseReport() {
     '',
     'Summary',
     row('Source address', ip),
+    ...(rdnsName(ip) ? [row('Reverse DNS', rdnsName(ip))] : []),
     ...(net || country ? [row('Network', [net, country].filter(Boolean).join(', '))] : []),
     row('First seen', utc(first)),
     row('Last seen', utc(last)),

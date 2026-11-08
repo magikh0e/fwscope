@@ -2,11 +2,13 @@
 
 # fwscope
 
-A single-file, offline visualizer for firewall and WAF logs: UFW / iptables, OPNsense / pfSense, Windows Firewall, and ModSecurity / Coraza. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box.
+A single-file, offline visualizer for firewall and WAF logs: UFW / iptables, OPNsense / pfSense, Windows Firewall, and ModSecurity / Coraza. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box. The one exception is the optional hostname lookup, which is off unless you turn it on (see [Hostnames](#hostnames-reverse-dns)).
 
 ![fwscope dashboard on a week of sample firewall and WAF logs: summary tiles, events over time split into firewall and WAF panels, a world map of sources with the top networks, and what blocking mode would do at each anomaly threshold](assets/screenshot.png)
 
-*The built-in sample data (made-up documentation addresses). Open `index.html?demo` to see it live.*
+*The built-in sample data (made-up documentation addresses).*
+
+**Try it in your browser:** [magikh0e.github.io/fwscope](https://magikh0e.github.io/fwscope/) opens the tool, and [`?demo`](https://magikh0e.github.io/fwscope/?demo) opens it on the sample data. Logs you drop there are read in your browser, just like the downloaded file. To use it offline, download `index.html` and open it from disk.
 
 ## What it reads
 
@@ -212,6 +214,17 @@ Measured on that firewall, in Chrome:
 
 For more than a week of a busy firewall, turn on the load options, or load a week at a time.
 
+## Hostnames (reverse DNS)
+
+**Hostnames**, in the filter bar, adds each address's reverse DNS name next to it, e.g. `66.249.66.1 crawl-66-249-66-1.googlebot.com`. It's **off by default**, because it's the one thing in fwscope that sends data off your machine:
+
+- **How it looks names up:** a browser can't send DNS queries itself, so it uses a DNS-over-HTTPS service you pick, **Cloudflare** or **Google**. Turning it on asks you first.
+- **What gets sent:** only public *source* addresses currently on screen: Top lists, the scans card, the New card, the what-if card and the visible page of the table. Destinations (usually your own servers) aren't looked up, and private, LAN, multicast and broadcast addresses are never sent. **Look up all N sources** in the filter bar resolves every source in the current view, up to 2,000, for example before filtering on hostnames.
+- **Who sees the lookup:** each address's reverse DNS servers, often run by the attacker's network, see the query come from the DNS service, not from you.
+- **Forward check:** every name is forward-confirmed, meaning its A/AAAA records must include the address. Anyone can set a reverse DNS name that *looks* like `googlebot.com`, so an unconfirmed name is shown in italics with a `?`.
+- **Cache:** results are kept in your browser for a week, so addresses aren't looked up again.
+- **Where else names appear:** known names also go into the abuse report and the CSV export (`src_rdns`). Those don't trigger new lookups.
+
 ## Filter syntax
 
 The filter box takes space-separated terms. All of them must match.
@@ -230,6 +243,7 @@ The filter box takes space-separated terms. All of them must match.
 | `status:` `method:` `sev:` | `status:403`, `status:400-499`, `method:post`, `sev:critical` |
 | `ua:` | `ua:*sqlmap*` (spaces in a user agent are written as `_`) |
 | `score:` | `score:10-1000`: requests with an inbound anomaly score of 10 or more (WAF) |
+| `rdns:` | `rdns:googlebot.com` (hostname ends with), `rdns:*.amazonaws.com`, `rdns:confirmed`, `rdns:unconfirmed`, `rdns:none` (looked up, no name). Only sources that have been looked up can match; see [Hostnames](#hostnames-reverse-dns) |
 | `seen:` | `seen:both`: addresses in both the firewall and the WAF logs (`seen:waf`, `seen:fw`) |
 | `act:` | `act:block`, `act:limit_block`, `act:audit_invalid` |
 | `flag:` | `flag:syn`, `flag:rst` (SYN ACK FIN RST PSH URG ECE CWR DF) |
