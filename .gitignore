@@ -17,3 +17,6 @@ logs/
 *.xml.*
 rules.debug
 *.debug
+
+# local test fixtures
+.private-test/

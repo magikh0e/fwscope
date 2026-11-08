@@ -192,6 +192,17 @@ tr:hover .cp, .cp:focus-visible { opacity: 1; }
 #map [role=button]:focus-visible { outline: none; stroke: var(--ink); stroke-width: 2; }
 .out-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: -4px 0 10px; font-size: 13px; }
 .out-links a { color: var(--accent); }
+.wi-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 10px 26px; }
+@media (max-width: 960px) { .wi-grid { grid-template-columns: minmax(0, 1fr); } }
+#wiTable td, #wiTable th { padding: 5px 8px; }
+#wiTable tr.sel td { background: var(--surface-2); font-weight: 600; }
+#wiTable tr.pick { cursor: pointer; }
+#wiTable tr.pick:hover td { background: var(--surface-2); }
+.wi-bar { display: inline-block; height: 6px; border-radius: 0 3px 3px 0; background: var(--a-block); vertical-align: middle; margin-left: 6px; }
+#wiDetail h3 { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 0 0 6px; }
+#wiDetail h3 b { color: var(--ink); }
+#wiDetail section { margin-bottom: 12px; }
+.why { color: var(--muted); font-size: 11.5px; margin-left: 6px; font-weight: 400; }
 .newnote { background: var(--surface-2); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
 
 /* map */
@@ -240,8 +251,10 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
 
   <section id="empty">
     <div id="drop">
-      <h2 style="margin:0 0 6px">Drop UFW, OPNsense or Windows Firewall logs here</h2>
+      <h2 style="margin:0 0 6px">Drop firewall or WAF logs here</h2>
+      <p>Firewalls: UFW / iptables, OPNsense / pfSense, Windows Firewall. Web application firewalls: ModSecurity and Coraza.</p>
       <p>Windows: <code>pfirewall.log</code> (copy it out from an admin prompt first).</p>
+      <p>ModSecurity: the audit log (<code>modsec_audit.log</code>, JSON or native format) or the <code>ModSecurity:</code> lines in an Apache or nginx error log.</p>
       <p>OPNsense / pfSense: <code>/var/log/filter/filter_*.log</code>, remote-syslog copies, or Live View API JSON.</p>
       <p>Plain <code>ufw.log</code>, rotated <code>.gz</code> files, <code>kern.log</code>/<code>syslog</code>, <code>dmesg -T</code> or <code>journalctl</code> output (text or <code>-o json</code>).</p>
       <p>Drop several at once to merge them. Duplicates across files are skipped (UFW writes the same line to ufw.log, kern.log and syslog).</p>
@@ -273,6 +286,14 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>Run both in an admin PowerShell. Logging is off by default; the first line turns on logging of dropped packets.</li>
           <li>Rename each copy after its PC (<code>office-pc.log</code>): the log has no hostname, so the file name is used.</li>
         </ul>
+        <h3>ModSecurity / Coraza</h3>
+        <pre>scp 'you@web:/var/log/modsec_audit.log*' .</pre>
+        <pre>grep 'ModSecurity:' /var/log/nginx/error.log &gt; modsec-errors.log</pre>
+        <ul>
+          <li>The audit log path is set by <code>SecAuditLog</code>. The JSON format (<code>SecAuditLogFormat JSON</code>) and the default native format both work.</li>
+          <li>Apache and nginx error logs work too: each request's <code>ModSecurity:</code> lines are grouped by their <code>unique_id</code>.</li>
+          <li>Name a file after its server (<code>shop-web.log</code>) to tell servers apart.</li>
+        </ul>
       </div>
       <div class="card">
         <h2>What gets logged</h2>
@@ -300,6 +321,12 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>No interface, rule or TTL is logged. Direction shows as <code>receive</code> (In) or <code>send</code> (Out).</li>
           <li>Times are local with no timezone, so read the log in the same timezone as the PC.</li>
         </ul>
+        <h3>ModSecurity</h3>
+        <ul>
+          <li><code>SecAuditEngine RelevantOnly</code> (the usual setting) logs requests that tripped a rule. Each one shows as <b>WAF BLOCK</b> if it was stopped, or <b>WAF DETECT</b> if it was only flagged.</li>
+          <li>Attack types (SQLi, XSS, LFI, RCE ...) come from the OWASP Core Rule Set's rule numbers, or from <code>attack-*</code> tags for other rule sets.</li>
+          <li>Load firewall logs alongside and addresses seen by both are marked <b>firewall + WAF</b>; filter them with <code>seen:both</code>.</li>
+        </ul>
       </div>
     </div>
   </section>
@@ -323,8 +350,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
     <div class="tiles" id="tiles"></div>
 
     <div class="card">
-      <div class="card-head"><h2>Events over time</h2><span class="sub" id="tlSub"></span><span class="grow"></span><div class="legend" id="tlLegend"></div></div>
-      <svg id="tl" height="230"></svg>
+      <div class="card-head"><h2>Events over time</h2><span class="sub" id="tlSub"></span><span class="grow"></span><label class="tog" id="tlSplitWrap" hidden title="Firewall and WAF events as two charts on the same time axis, each with its own scale"><input type="checkbox" id="tlSplit" checked> Split firewall / WAF</label><div class="legend" id="tlLegend"></div></div>
+      <svg id="tl"></svg>
       <div class="hint">Drag across the chart to zoom into a time range. Double-click to reset.</div>
     </div>
 
@@ -350,6 +377,22 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         </div>
       </div>
       <div class="geo-attr" id="geoAttr"></div>
+    </div>
+
+    <div class="card" id="whatifCard" hidden>
+      <div class="card-head"><h2>If blocking were on</h2><span class="sub" id="wiSub"></span></div>
+      <div class="newnote" id="wiNote" hidden></div>
+      <div class="wi-grid">
+        <div><div class="tbl-wrap"><table id="wiTable"></table></div>
+          <div class="hint">CRS blocks a request once its inbound anomaly score reaches the threshold (5 by default), and a response once its outbound score reaches the outbound threshold. Pick a threshold to see what it would catch. "Possibly legitimate" means your own or LAN addresses, sources that mostly send a known crawler's user agent, or requests that tripped only protocol-policy rules and no attack rules.</div></div>
+        <div id="wiDetail"></div>
+      </div>
+    </div>
+
+    <div class="card" id="tuneCard" hidden>
+      <div class="card-head"><h2>Tuning suggestions</h2><span class="sub" id="tuneSub"></span><span class="grow"></span><button id="btnTune">Draft exclusions</button></div>
+      <div class="tbl-wrap"><table id="tuneTable"></table></div>
+      <div class="hint">Rules that fire mostly on possibly legitimate traffic (verified crawlers, your own or LAN addresses) for one path or group of addresses. "Unblocks" is what excluding that rule there would change at the threshold picked above: possibly legitimate requests that would get through, and other requests (likely attacks) that would too. Click a row to see its requests.</div>
     </div>
 
     <div class="card" id="newCard">
@@ -625,17 +668,22 @@ function resetStore() {
   D = { n: 0, cap: 0, c: {}, ip: new Intern(), proto: new Intern(), iface: new Intern(), host: new Intern(), mac: new Intern(), act: new Intern(), rule: new Intern(),
         actGroup: [], files: [], kinds: {}, dupes: 0, skipped: 0, lines: 0, noTime: 0, prior: [], order: null, ipc: null, minTs: NaN, maxTs: NaN };
   D.iface.id(''); D.host.id(''); D.mac.id(''); D.ip.id(''); D.rule.id('');
+  // WAF: interned web fields; rule combos (one per distinct set of rule ids) carry their rules and attack categories
+  D.waf = false; D.whost = new Intern(); D.uri = new Intern(); D.path = new Intern(); D.method = new Intern(); D.ua = new Intern();
+  D.wcombo = new Intern(); D.wrule = new Intern(); D.wcat = new Intern(); D.wmsg = new Map(); D.wcatOf = new Map();
+  for (const x of [D.whost, D.uri, D.path, D.method, D.ua, D.wcombo]) x.id('');
+  D.wcomboRules = [[]]; D.wcomboCats = [0]; D.wcomboCatList = [[]]; D.viaCf = 0; D.viaProxy = 0; D.cfgIn = new Map(); D.cfgOut = new Map(); D.scoreEst = 0; D.wruleSev = new Map();
   grow(1 << 14);
 }
 const ROW_BYTES = Object.values(COLS).reduce((s, T) => s + T.BYTES_PER_ELEMENT, 0);
 // A browser tab runs out of memory somewhere past this; stop loading cleanly instead.
 const MAX_EVENTS = 20e6;
 function grow(cap) {
-  for (const [k, T] of Object.entries(COLS)) { const a = new T(cap); if (D.c[k]) a.set(D.c[k].subarray(0, D.n)); D.c[k] = a; }
+  for (const [k, T] of Object.entries(D.waf ? { ...COLS, ...WCOLS } : COLS)) { const a = new T(cap); if (D.c[k]) a.set(D.c[k].subarray(0, D.n)); D.c[k] = a; }
   D.cap = cap;
 }
 const nextCap = cap => cap < 4194304 ? cap * 2 : Math.ceil(cap * 1.5);
-const memMB = () => Math.round((D.cap * ROW_BYTES + D.prior.reduce((s, p) => s + p.keys.byteLength, 0)) / 1e6);
+const memMB = () => Math.round((D.cap * (ROW_BYTES + (D.waf ? Object.values(WCOLS).reduce((s, T) => s + T.BYTES_PER_ELEMENT, 0) : 0)) + D.prior.reduce((s, p) => s + p.keys.byteLength, 0)) / 1e6);
 
 /* load-time skipping: rows dropped here never use memory (the view toggles only hide them) */
 const LOAD = { chatter: false, blocksOnly: false, tz: '' };
@@ -673,7 +721,7 @@ function isChatter(r) {
 }
 function actId(label) {
   const id = D.act.id(label);
-  if (D.actGroup[id] === undefined) D.actGroup[id] = label.startsWith('LIMIT') ? 1 : label.startsWith('ALLOW') || label.startsWith('PASS') ? 2 : label.startsWith('AUDIT') ? 3 : 0;
+  if (D.actGroup[id] === undefined) D.actGroup[id] = label.startsWith('LIMIT') ? 1 : label.startsWith('ALLOW') || label.startsWith('PASS') ? 2 : label.startsWith('AUDIT') || label.startsWith('WAF DETECT') ? 3 : 0;
   return id;
 }
 
@@ -707,6 +755,7 @@ function parseTime(line, ctx) {
 }
 
 function handleLine(line, ctx) {
+  if ((ctx.nrec || line.charCodeAt(0) === 45) && nativeLine(line.trimEnd(), ctx)) return; // '--': ModSecurity native audit log
   if (line.charCodeAt(0) === 35) return wfHeader(line, ctx); // '#': Windows Firewall log header
   if (line.length < 20) return;
   if (line.charCodeAt(0) === 123) return handleJson(line, ctx); // '{'
@@ -718,6 +767,7 @@ function handleLine(line, ctx) {
     if (t.len) { const hm = RE_HOST.exec(line.slice(t.len, u)); if (hm) host = hm[1]; }
     return ufwMsg(line, t.ts, host, ctx);
   }
+  if (line.indexOf('ModSecurity: ') >= 0) { D.lines++; modsecErrorLine(line, ctx); return; }
   const f = line.indexOf('filterlog');
   if (f >= 0) {
     D.lines++;
@@ -791,6 +841,7 @@ function handleJson(line, ctx) {
 }
 function handleObj(o, ctx) {
   if (!o || typeof o !== 'object') return;
+  if (o.transaction && typeof o.transaction === 'object') { D.lines++; if ('client_ip' in o.transaction) modsecV3(o, ctx); else modsecV2(o, ctx); return; }
   if (typeof o.MESSAGE === 'string') { // journalctl -o json
     const ts = o.__REALTIME_TIMESTAMP ? +o.__REALTIME_TIMESTAMP / 1000 : NaN, host = o._HOSTNAME || '';
     if (o.MESSAGE.includes('[UFW ')) { D.lines++; ufwMsg(o.MESSAGE, ts, host, ctx); }
@@ -818,6 +869,222 @@ function addRow(r, ctx) {
   c.len[n] = r.len ?? -1; c.ttl[n] = r.ttl ?? -1; c.flags[n] = r.flags || 0;
   c.itype[n] = r.itype ?? -1; c.icode[n] = r.icode ?? -1;
   c.host[n] = D.host.id(r.host || ''); c.mac[n] = D.mac.id(r.mac || ''); c.rule[n] = D.rule.id(r.rule || '');
+  if (D.waf) {
+    const w = r.w;
+    c.whost[n] = w ? D.whost.id(w.host) : 0; c.uri[n] = w ? D.uri.id(w.uri) : 0; c.path[n] = w ? D.path.id(w.path) : 0;
+    c.method[n] = w ? D.method.id(w.method) : 0; c.status[n] = w ? w.status : -1; c.wr[n] = w ? w.combo : 0;
+    c.sev[n] = w ? w.sev : -1; c.score[n] = w ? w.score : -1; c.oscore[n] = w ? w.oscore : -1; c.ua[n] = w ? D.ua.id(w.ua) : 0;
+  }
+}
+
+/* ---------- ModSecurity / Coraza WAF logs
+   A WAF event is one HTTP request with the rules it tripped. It shares the packet columns (time, client as
+   src, server as dst, ports, action, logging host) and adds web columns, allocated only once WAF data loads.
+   Formats: libmodsecurity v3 JSON audit log, mod_security2 JSON audit log, the native (multi-part) audit
+   log, and "ModSecurity:" lines in Apache / nginx error logs (grouped per request by unique_id). */
+const WCOLS = { whost: Uint16Array, uri: Uint32Array, path: Uint32Array, method: Uint8Array, status: Int16Array, wr: Uint32Array, sev: Int8Array, score: Int16Array, oscore: Int16Array, ua: Uint32Array };
+function enableWaf() {
+  if (D.waf) return;
+  D.waf = true;
+  for (const [k, T] of Object.entries(WCOLS)) { const a = new T(D.cap); if (k === 'status' || k === 'sev' || k === 'score' || k === 'oscore') a.fill(-1); D.c[k] = a; }
+}
+// OWASP Core Rule Set: the rule number says what kind of attack it looks for
+const CRS_CATS = { 911: 'Method', 913: 'Scanner', 920: 'Protocol', 921: 'Protocol attack', 922: 'Multipart', 930: 'LFI', 931: 'RFI', 932: 'RCE', 933: 'PHP', 934: 'Generic', 941: 'XSS', 942: 'SQLi', 943: 'Session fixation', 944: 'Java', 950: 'Data leak', 951: 'SQL error leak', 952: 'Java leak', 953: 'PHP leak', 954: 'IIS leak', 955: 'Web shell' };
+// non-CRS rule sets usually still tag the attack type
+const TAG_CATS = { 'attack-sqli': 'SQLi', 'attack-xss': 'XSS', 'attack-lfi': 'LFI', 'attack-rfi': 'RFI', 'attack-rce': 'RCE', 'attack-injection-php': 'PHP', 'attack-protocol': 'Protocol', 'attack-reputation-scanner': 'Scanner', 'attack-fixation': 'Session fixation', 'attack-disclosure': 'Data leak', 'attack-injection-java': 'Java', 'attack-generic': 'Generic', 'attack-multipart-header': 'Multipart' };
+const SEVS = { EMERGENCY: 0, ALERT: 1, CRITICAL: 2, ERROR: 3, WARNING: 4, NOTICE: 5, INFO: 6, DEBUG: 7 };
+const SEV_NAMES = ['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug'];
+// rules that only add up or report scores, rather than detecting something themselves
+const isScoreRule = id => /^9(49|59|80)\d{3}$/.test(id) || /^90[0-5]\d{3}$/.test(id);
+function wafCategory(id, tags) {
+  for (const t of tags || []) { const c = TAG_CATS[String(t).toLowerCase()]; if (c) return c; }
+  const n = +id;
+  if (n >= 900000 && n < 1000000) return CRS_CATS[Math.floor(n / 1000)] || (isScoreRule(id) ? null : 'Other CRS');
+  return id ? 'Custom' : null;
+}
+const sevNum = v => v == null || v === '' ? -1 : /^\d+$/.test(String(v)) ? +v : SEVS[String(v).toUpperCase()] ?? -1;
+// "[id "942100"] [msg "..."] [tag "a"] [tag "b"]" -> { id, msg, sev, tags, ... }
+function modsecFields(s) {
+  const f = { tags: [] };
+  for (const m of s.matchAll(/\[(\w+) "((?:[^"\\]|\\.)*)"\]/g)) { const v = m[2].replace(/\\"/g, '"'); if (m[1] === 'tag') f.tags.push(v); else if (!(m[1] in f)) f[m[1]] = v; }
+  return f;
+}
+function wafHostName(ctx) {
+  const stem = (ctx.name || '').replace(/(\.(log|json|txt|gz|\d+))+$/i, '');
+  return !stem || /^(modsec[_-]?audit|audit|error|error_log|modsec(urity)?|sample \(generated\)|pasted text)$/i.test(stem) ? 'waf' : stem;
+}
+const headerOf = (h, name) => { if (!h) return ''; const k = Object.keys(h).find(x => x.toLowerCase() === name); return k ? String(h[k]) : ''; };
+const MON3 = s => MON[s.slice(0, 1).toUpperCase() + s.slice(1, 3).toLowerCase()];
+// 07/Nov/2026:12:00:00.123456 +0000
+function apacheTime(s) {
+  // mod_security2 writes zones west of UTC with a doubled minus ("--1000"), so allow an extra '-'
+  const m = /(\d{1,2})\/(\w{3})\/(\d{4}):(\d\d):(\d\d):(\d\d)(?:\.(\d+))?\s*-?([+-])(\d\d):?(\d\d)/.exec(s || '');
+  if (!m) return NaN;
+  const off = (m[8] === '-' ? -1 : 1) * (+m[9] * 60 + +m[10]);
+  return Date.UTC(+m[3], MON3(m[2]), +m[1], +m[4], +m[5], +m[6], m[7] ? +(m[7] + '00').slice(0, 3) : 0) - off * 6e4;
+}
+// "Fri Nov  7 12:00:00 2026" (v3 audit log and Apache error log; no zone)
+function ctimeTime(s) {
+  const m = /(\w{3})\s+(\d{1,2})\s+(\d\d):(\d\d):(\d\d)(?:\.\d+)?\s+(\d{4})/.exec(s || '');
+  return m && MON3(m[1]) !== undefined ? wallTime(+m[6], MON3(m[1]), +m[2], +m[3], +m[4], +m[5]) : NaN;
+}
+// crawlers announce themselves; scanner tools that call themselves "bot" are not crawlers
+const CRAWLER_UA = /bot\b|bot\/|crawler|spider|slurp|petalsearch|yandex|baidu|bingpreview|facebookexternalhit|ia_archiver/i;
+// big crawlers only crawl from their own networks; a claim from anywhere else is fake (needs an ASN database)
+const CRAWLER_ASNS = [[/googlebot|google-|adsbot-google|mediapartners-google|apis-google/i, [15169]], [/bingbot|bingpreview|msnbot/i, [8075]], [/yandex/i, [13238, 208722]],
+  [/baiduspider/i, [55967, 38365]], [/applebot/i, [714, 6185]], [/petalbot|aspiegelbot/i, [136907]], [/bytespider/i, [396986, 138699]],
+  [/gptbot|chatgpt-user|oai-searchbot/i, [8075]], [/ccbot/i, [16509, 14618]]];
+// 'crawler', 'fake' (claims to be a big crawler from someone else's network, or keeps switching which crawler it
+// claims to be) or '' (not a crawler). uaIds: the source's user-agent counts, when known.
+const botName = ua => ((/[\w-]*(?:bot|crawler|spider)/i.exec(ua) || [''])[0]).toLowerCase();
+function crawlerKind(src, ua, uaIds) {
+  if (!CRAWLER_UA.test(ua) || SCANNER_UA.test(ua)) return '';
+  const brand = CRAWLER_ASNS.find(([re]) => re.test(ua)), asn = D.geo && D.ipAS[src] >= 0 ? D.asnNum[D.ipAS[src]] : null;
+  if (brand && asn !== null) return brand[1].includes(asn) ? 'crawler' : 'fake'; // network check settles it
+  // otherwise: a source that claims three or more different crawlers is pretending
+  if (uaIds) { const names = new Set(); for (const k of uaIds.keys()) { const n = botName(D.ua.list[k] || ''); if (n) names.add(n); } if (names.size >= 3) return 'fake'; }
+  return 'crawler';
+}
+const SCANNER_UA = /nikto|nmap|zgrab|sqlmap|masscan|nuclei|wpscan|acunetix|nessus|openvas|dirbuster|gobuster|ffuf|censys|shodan|expanse/i;
+// Behind Cloudflare, the WAF sees Cloudflare's edge as the client; the visitor is in CF-Connecting-IP. That header
+// is only trusted when the connection really came from Cloudflare's published ranges (anyone can send the header).
+// Behind a reverse proxy on the LAN, the first X-Forwarded-For address is the client.
+const CF_RANGES = ['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+  '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+  '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32'];
+let cfMatch = null;
+const inCloudflare = ip => { if (!cfMatch) { const ms = CF_RANGES.map(ipMatcher); cfMatch = x => ms.some(m => m(x)); } return !!ip && cfMatch(ip); };
+const validIp = x => !!x && !!ipBits(x.trim());
+function realClient(ev, headers) {
+  const cf = headerOf(headers, 'cf-connecting-ip').trim();
+  if (cf && validIp(cf) && inCloudflare(ev.src)) { ev.via = ev.src; ev.src = cf; D.viaCf++; return; }
+  const xff = headerOf(headers, 'x-forwarded-for').split(',')[0].trim();
+  if (xff && validIp(xff) && ev.src && (ipClass(ev.src) & 1)) { ev.via = ev.src; ev.src = xff; D.viaProxy++; }
+}
+// one normalised WAF event -> a row
+function wafEvent(ev, ctx) {
+  D.kinds.waf = 1;
+  const msgs = (ev.msgs || []).filter(m => m.id || m.msg);
+  if (!msgs.length && !ev.intercepted) return; // a request with no rule hits isn't a WAF event
+  if (isDup(ev.ts, ev.uid || [ev.src, ev.method, ev.uri, msgs.map(m => m.id).join(',')].join(' '), ctx)) return;
+  enableWaf();
+  const ids = [...new Set(msgs.map(m => m.id).filter(Boolean))].sort();
+  for (const m of msgs) if (m.id && m.msg && !D.wmsg.has(m.id)) D.wmsg.set(m.id, m.msg.replace(/\s+/g, ' ').slice(0, 160));
+  for (const m of msgs) if (m.id && !D.wruleSev.has(m.id) && sevNum(m.sev) >= 0) D.wruleSev.set(m.id, sevNum(m.sev));
+  let sev = -1, score = ev.score ?? -1, oscore = -1, est = false;
+  const detecting = msgs.filter(m => !isScoreRule(m.id || ''));
+  for (const m of msgs) {
+    const s = sevNum(m.sev); if (s >= 0 && (sev < 0 || s < sev) && (!detecting.length || detecting.includes(m))) sev = s;
+    const t = m.msg || '';
+    // CRS 4 reports both scores on every request (980170); CRS 3 and the blocking rules report the total when exceeded
+    const ib = /Inbound Scores: blocking=(\d+)/i.exec(t) || /Total Inbound Score: (\d+)/i.exec(t) || /Inbound Anomaly Score Exceeded \(Total Score: (\d+)/i.exec(t) || /Total Score: (\d+)/i.exec(t);
+    if (ib && +ib[1] > score) score = +ib[1];
+    const ob = /Outbound Scores: blocking=(\d+)/i.exec(t) || /Outbound Anomaly Score Exceeded \((?:Total Score|score):? (\d+)/i.exec(t);
+    if (ob && +ob[1] > oscore) oscore = +ob[1];
+    const ti = /Inbound Scores:[^)]*threshold=(\d+)/i.exec(t), to = /Outbound Scores:[^)]*threshold=(\d+)/i.exec(t);
+    if (ti) D.cfgIn.set(+ti[1], (D.cfgIn.get(+ti[1]) || 0) + 1);
+    if (to) D.cfgOut.set(+to[1], (D.cfgOut.get(+to[1]) || 0) + 1);
+    if (m.id) { const c = wafCategory(m.id, m.tags); if (c) { let set = D.wcatOf.get(m.id); if (!set) D.wcatOf.set(m.id, c); } }
+  }
+  // no score reported at all: add up the detecting rules the way CRS does (critical 5, error 4, warning 3, notice 2)
+  if (score < 0 && detecting.length) {
+    est = true; let si = 0, so = 0;
+    for (const m of detecting) { const w = [5, 5, 5, 4, 3, 2][sevNum(m.sev)] ?? 0; if (/^95\d{4}$/.test(m.id || '')) so += w; else si += w; }
+    score = si; if (oscore < 0 && so) oscore = so;
+  }
+  if (est) D.scoreEst++;
+  const combo = ids.join(',');
+  let ci = D.wcombo.map.get(combo);
+  if (ci === undefined) {
+    ci = D.wcombo.id(combo);
+    const ri = ids.map(id => D.wrule.id(id));
+    let mask = 0; for (const id of ids) { const c = D.wcatOf.get(id); if (c) mask |= 1 << D.wcat.id(c); }
+    D.wcomboRules[ci] = ri; D.wcomboCats[ci] = mask;
+    D.wcomboCatList[ci] = [...new Set(ids.map(id => D.wcatOf.get(id)).filter(Boolean).map(c => D.wcat.id(c)))];
+  }
+  const uri = ev.uri || '', path = uri.split('?')[0];
+  addRow({ ts: ev.ts, host: wafHostName(ctx), act: ev.intercepted ? 'WAF BLOCK' : 'WAF DETECT', proto: 'HTTP',
+    src: ev.src, spt: ev.spt, dst: ev.dst, dpt: ev.dpt,
+    w: { host: ev.site || '', uri, path, method: (ev.method || '').toUpperCase(), status: ev.status ?? -1, combo: ci, sev, score, oscore, ua: ev.ua || '' } }, ctx);
+}
+// libmodsecurity v3 JSON (one object per line)
+function modsecV3(o, ctx) {
+  const t = o.transaction, rq = t.request || {}, rs = t.response || {};
+  const msgs = (t.messages || []).map(m => { const d = m.details || {}; return { id: d.ruleId, msg: m.message, sev: d.severity, tags: d.tags }; });
+  const status = rs.http_code != null ? +rs.http_code : -1;
+  const intercepted = (t.intervention && t.intervention.status != null) || msgs.some(m => /^9[45]9\d{3}$/.test(m.id || '') && status >= 400) || (status === 403 && msgs.length > 0);
+  const ev3 = { ts: ctimeTime(t.time_stamp), uid: t.unique_id, src: t.client_ip, spt: t.client_port != null ? +t.client_port : undefined, dst: t.host_ip, dpt: t.host_port != null ? +t.host_port : undefined,
+    site: headerOf(rq.headers, 'host'), method: rq.method, uri: rq.uri, status, ua: headerOf(rq.headers, 'user-agent'), msgs, intercepted };
+  realClient(ev3, rq.headers); wafEvent(ev3, ctx);
+}
+// mod_security2 JSON (SecAuditLogFormat JSON)
+function modsecV2(o, ctx) {
+  const t = o.transaction, rq = o.request || {}, rs = o.response || {}, ad = o.audit_data || {};
+  const [method, uri] = (rq.request_line || '').split(' ');
+  const msgs = (ad.messages || []).map(s => { const f = modsecFields(s); return { id: f.id, msg: f.msg || s.split(' [')[0], sev: f.severity, tags: f.tags }; });
+  const ev2 = { ts: apacheTime(t.time), uid: t.transaction_id, src: t.remote_address, spt: t.remote_port != null ? +t.remote_port : undefined, dst: t.local_address, dpt: t.local_port != null ? +t.local_port : undefined,
+    site: headerOf(rq.headers, 'host'), method, uri, status: rs.status != null ? +rs.status : -1, ua: headerOf(rq.headers, 'user-agent'), msgs,
+    intercepted: !!(ad.action && ad.action.intercepted) };
+  realClient(ev2, rq.headers); wafEvent(ev2, ctx);
+}
+// native audit log: --<boundary>-A-- ... --<boundary>-Z--, one section per letter
+function nativeLine(line, ctx) {
+  const m = /^--([0-9a-zA-Z]+)-([A-Z])--\s*$/.exec(line);
+  if (m) {
+    if (m[2] === 'A') { nativeFlush(ctx); ctx.nrec = { id: m[1] }; D.lines++; }
+    if (ctx.nrec && m[1] === ctx.nrec.id) { if (m[2] === 'Z') nativeFlush(ctx); else ctx.nsec = m[2]; }
+    return true;
+  }
+  if (!ctx.nrec || !ctx.nsec) return false;
+  (ctx.nrec[ctx.nsec] ||= []).push(line);
+  return true;
+}
+function nativeFlush(ctx) {
+  const r = ctx.nrec; ctx.nrec = null; ctx.nsec = null;
+  if (!r || !r.A) return;
+  const a = /^\[([^\]]+)\]\s+(\S+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)/.exec(r.A[0] || '');
+  if (!a) return;
+  const B = r.B || [], hdr = {};
+  for (const l of B.slice(1)) { const k = l.indexOf(':'); if (k > 0) hdr[l.slice(0, k).trim().toLowerCase()] = l.slice(k + 1).trim(); }
+  const [method, uri] = (B[0] || '').split(' ');
+  const st = /^HTTP\/[\d.]+\s+(\d{3})/.exec((r.F || [])[0] || '');
+  const H = r.H || [];
+  const msgs = H.filter(l => l.startsWith('Message:')).map(l => { const f = modsecFields(l); return { id: f.id, msg: f.msg || l.slice(9).split(' [')[0], sev: f.severity, tags: f.tags }; });
+  const evn = { ts: apacheTime(a[1]), uid: a[2], src: a[3], spt: +a[4], dst: a[5], dpt: +a[6], site: hdr.host || '', method, uri,
+    status: st ? +st[1] : -1, ua: hdr['user-agent'] || '', msgs, intercepted: H.some(l => /^Action:\s*Intercepted/i.test(l)) };
+  realClient(evn, hdr); wafEvent(evn, ctx);
+}
+// error log lines: one line per rule hit; lines of one request share a unique_id
+function modsecErrorLine(line, ctx) {
+  const f = modsecFields(line);
+  const body = line.slice(line.indexOf('ModSecurity:') + 12).trim();
+  let ts = NaN, src = '', spt, method = '', uri = f.uri || '', site = f.hostname || '';
+  const ap = /^\[(\w{3} \w{3}\s+\d{1,2} \d\d:\d\d:\d\d(?:\.\d+)? \d{4})\]/.exec(line);
+  if (ap) {
+    ts = ctimeTime(ap[1]);
+    const cl = [...line.matchAll(/\[client ([^\]]+)\]/g)].map(x => x[1]);
+    src = cl.length ? cl[cl.length - 1] : '';
+    if (cl.length > 1 && cl[0].startsWith(src + ':')) spt = +cl[0].slice(src.length + 1);
+    else if (cl.length === 1 && /^[\d.]+:\d+$/.test(src)) { spt = +src.split(':')[1]; src = src.split(':')[0]; }
+  } else {
+    const ng = /^(\d{4})\/(\d\d)\/(\d\d) (\d\d):(\d\d):(\d\d)/.exec(line);
+    if (ng) ts = wallTime(+ng[1], +ng[2] - 1, +ng[3], +ng[4], +ng[5], +ng[6]);
+    const c = /, client: ([^,]+)/.exec(line); if (c) src = c[1].trim();
+    const rq = /, request: "(\S+) (\S+)/.exec(line); if (rq) { method = rq[1]; uri = rq[2]; }
+    const h = /, host: "([^"]+)"/.exec(line); if (h) site = h[1];
+  }
+  const code = /with code (\d{3})/.exec(body);
+  const uid = f.unique_id || `${src} ${ts} ${uri}`;
+  const msg = { id: f.id, msg: f.msg || body.split(' [')[0], sev: f.severity, tags: f.tags };
+  const p = ctx.elog;
+  if (p && p.uid === uid) { p.msgs.push(msg); if (/^Access denied/.test(body)) p.intercepted = true; if (code) p.status = +code[1]; if (!p.method && method) { p.method = method; p.uri = uri; } return; }
+  wafFlush(ctx);
+  ctx.elog = { ts, uid, src, spt, site, method, uri, status: code ? +code[1] : -1, msgs: [msg], intercepted: /^Access denied/.test(body) };
+}
+function wafFlush(ctx) {
+  if (ctx.nrec) nativeFlush(ctx);
+  const p = ctx.elog; ctx.elog = null;
+  if (p) wafEvent(p, ctx);
 }
 
 /* ---------- OPNsense / pfSense filterlog
@@ -900,7 +1167,7 @@ function ufwMsg(msg, ts, host, ctx) {
 }
 
 function newCtx(ref) { const r = ref || Date.now(); return { ref: r, year: new Date(r).getFullYear(), keys: new Float64Array(4096), kn: 0, lo: Infinity, hi: -Infinity, nan: false, pk: 0, skipped0: D.skipped }; }
-function closeCtx(ctx) { if (ctx.kn) D.prior.push({ keys: ctx.keys.slice(0, ctx.kn), lo: ctx.lo, hi: ctx.hi, nan: ctx.nan, set: null }); }
+function closeCtx(ctx) { wafFlush(ctx); if (ctx.kn) D.prior.push({ keys: ctx.keys.slice(0, ctx.kn), lo: ctx.lo, hi: ctx.hi, nan: ctx.nan, set: null }); }
 
 const tick = () => new Promise(r => setTimeout(r, 0));
 function progress(text, frac) {
@@ -932,7 +1199,8 @@ async function readFile(file, idx, total) {
   const ctx = newCtx(file.lastModified); ctx.name = file.name;
   const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
   const gz = head[0] === 0x1f && head[1] === 0x8b;
-  if (!gz && /^\s*\[/.test(await file.slice(0, 64).text())) { // a JSON array, e.g. saved from the OPNsense API
+  // a JSON array, e.g. saved from the OPNsense API (not "[Sat Nov 07 ...", which is an Apache error log)
+  if (!gz && /^\s*\[\s*[{"\]]/.test(await file.slice(0, 64).text())) {
     const before = D.n; jsonArray(await file.text(), ctx); closeCtx(ctx);
     D.files.push({ name: file.name, events: D.n - before, skipped: D.skipped - ctx.skipped0 }); return;
   }
@@ -994,7 +1262,7 @@ async function loadText(name, text, ref) {
   progress('Parsing ' + name + '…', null); await tick();
   const ctx = newCtx(ref); ctx.name = name;
   const before = D.n;
-  const lines = /^\s*\[/.test(text) ? (jsonArray(text, ctx), []) : text.split('\n');
+  const lines = /^\s*\[\s*[{"\]]/.test(text) ? (jsonArray(text, ctx), []) : text.split('\n');
   for (let i = 0; i < lines.length && !D.stop; i++) { handleLine(lines[i], ctx); if ((i & 32767) === 32767) { progress(`Parsing ${name}`, i / lines.length); await tick(); } }
   closeCtx(ctx);
   D.files.push({ name, events: D.n - before, skipped: D.skipped - ctx.skipped0, partial: !!D.stop });
@@ -1041,6 +1309,13 @@ function finish() {
   // OPNsense says PASS where UFW says ALLOW; name the group after what's in the logs
   const allowTags = new Set(D.act.list.filter((s, id) => D.actGroup[id] === 2).map(s => s.startsWith('PASS') ? 'PASS' : 'ALLOW'));
   GROUPS[2].name = allowTags.size === 1 ? [...allowTags][0] : allowTags.size ? 'ALLOW/PASS' : 'ALLOW';
+  const g3 = new Set(D.act.list.filter((s, id) => D.actGroup[id] === 3).map(s => s.startsWith('WAF') ? 'DETECT' : 'AUDIT'));
+  GROUPS[3].name = g3.size === 1 ? [...g3][0] : g3.size ? 'AUDIT/DETECT' : 'AUDIT';
+  // which sources the firewall saw, which the WAF saw, and which both did (bit 1 firewall, bit 2 WAF)
+  D.actWaf = Uint8Array.from(D.act.list, s => s.startsWith('WAF') ? 1 : 0);
+  D.ipSeen = new Uint8Array(D.ip.list.length);
+  for (let i = 0; i < D.n; i++) D.ipSeen[D.c.src[i]] |= D.actWaf[D.c.act[i]] ? 2 : 1;
+  D.both = D.waf && (D.kinds.ufw || D.kinds.opn || D.kinds.win);
   D.hasRules = D.rule.list.length > 1;
   $('#empty').hidden = true; $('#dash').hidden = false; $('#btnClear').hidden = false; $('#btnReport').hidden = false;
   F.page = 0;
@@ -1088,7 +1363,7 @@ function numMatcher(v) {
 // precompute a lookup table over an interned string list
 const table = (intern, fn) => Uint8Array.from(intern.list, s => fn(s) ? 1 : 0);
 
-const FIELDS = ['src','dst','ip','spt','dpt','port','proto','in','out','iface','host','mac','act','action','flag','type','ttl','len','rule','cc','country','asn','org'];
+const FIELDS = ['src','dst','ip','spt','dpt','port','proto','in','out','iface','host','mac','act','action','flag','type','ttl','len','rule','cc','country','asn','org','site','path','uri','method','status','wrule','attack','sev','ua','seen','score'];
 function compileQuery(q) {
   const preds = [];
   const c = D.c;
@@ -1126,6 +1401,34 @@ function compileQuery(q) {
       }
       case 'rule': { const m = strMatcher(v), l = v.toLowerCase(), words = l.replace(/_/g, ' '); const T = Uint8Array.from(D.rule.list, s => s && (m(s) || s.toLowerCase().startsWith(l) || (ruleLabel(s) || '').toLowerCase().includes(words)) ? 1 : 0); p = i => T[c.rule[i]]; break; }
       case 'host': { const T = table(D.host, strMatcher(v)); p = i => T[c.host[i]]; break; }
+      case 'seen': {
+        const want = { fw: 1, firewall: 1, waf: 2, both: 3 }[v.toLowerCase()];
+        if (!want) throw new Error('seen: takes fw, waf or both');
+        if (!D.waf) throw new Error('seen: needs WAF logs loaded alongside firewall logs');
+        const T = Uint8Array.from(D.ipSeen, f => want === 3 ? f === 3 : (f & want) ? 1 : 0); p = i => T[c.src[i]]; break;
+      }
+      case 'site': case 'path': case 'uri': case 'method': case 'status': case 'wrule': case 'attack': case 'sev': case 'ua': case 'score': {
+        if (!D.waf) throw new Error(k + ': needs WAF (ModSecurity) logs');
+        const anyOf = x => { const ms = x.split(',').filter(Boolean).map(strMatcher); return t => ms.some(m => m(t)); };
+        if (k === 'site') { const T = table(D.whost, anyOf(v)); p = i => T[c.whost[i]]; }
+        else if (k === 'path') { const T = table(D.path, anyOf(v)); p = i => T[c.path[i]]; }
+        else if (k === 'uri') { const l = v.toLowerCase(); const T = table(D.uri, s => s.toLowerCase().includes(l)); p = i => T[c.uri[i]]; }
+        else if (k === 'method') { const T = table(D.method, anyOf(v)); p = i => T[c.method[i]]; }
+        else if (k === 'status') { const f = numMatcher(v); p = i => c.status[i] >= 0 && f(c.status[i]); }
+        else if (k === 'score') { const f = numMatcher(v); p = i => c.score[i] >= 0 && f(c.score[i]); }
+        else if (k === 'sev') { const n = SEVS[v.toUpperCase()]; const f = n !== undefined ? x => x === n : numMatcher(v); p = i => c.sev[i] >= 0 && f(c.sev[i]); }
+        else if (k === 'ua') { const m = strMatcher(v); const T = table(D.ua, s => !!s && m(s.replace(/\s+/g, '_'))); p = i => T[c.ua[i]]; }
+        else if (k === 'wrule') {
+          // rule id(s) / ranges, or words from the rule message
+          const byNum = /^[\d,-]+$/.test(v), f = byNum ? numMatcher(v) : null, l = v.toLowerCase().replace(/_/g, ' ');
+          const R = Uint8Array.from(D.wrule.list, id => byNum ? f(+id) : (D.wmsg.get(id) || '').toLowerCase().includes(l) ? 1 : 0);
+          const T = Uint8Array.from(D.wcomboRules, rs => rs.some(r => R[r]) ? 1 : 0); p = i => T[c.wr[i]];
+        } else {
+          const m = anyOf(v.replace(/_/g, ' ')); let bits = 0; D.wcat.list.forEach((cn, x) => { if (m(cn)) bits |= 1 << x; });
+          const T = Uint8Array.from(D.wcomboCats, mask => mask & bits ? 1 : 0); p = i => T[c.wr[i]];
+        }
+        break;
+      }
       case 'mac': { const T = table(D.mac, strMatcher(v)); p = i => T[c.mac[i]]; break; }
       case 'act': case 'action': { const m = strMatcher(v.replace(/_/g, ' ')); const T = Uint8Array.from(D.act.list, (s, id) => m(s) || m(GROUPS[D.actGroup[id]].name) ? 1 : 0); p = i => T[c.act[i]]; break; }
       case 'cc': case 'country': {
@@ -1156,14 +1459,14 @@ function compileQuery(q) {
 }
 
 /* ============================================================ filter state */
-const F = { preset: 'all', range: null, acts: [true, true, true, true], q: '', preds: [], hideNoise: false, publicOnly: false, page: 0, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false };
+const F = { preset: 'all', range: null, acts: [true, true, true, true], q: '', preds: [], hideNoise: false, publicOnly: false, page: 0, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false, blockT: 0 };
 let SEL = new Uint32Array(0);
 
 /* ============================================================ view state: kept in the page address and the browser
    #q=dpt:22&t=7d&a=1101&n=1&p=1&d=src,dpt,asn&o=1   (t is a preset or "from-to" in epoch ms)
    The address makes a view bookmarkable; local storage brings it back on the next visit.
    A zoomed time range is only kept in the address: it rarely fits the next set of logs. */
-const VIEW_DEFAULT = { preset: 'all', range: null, acts: [true, true, true, true], q: '', hideNoise: false, publicOnly: false, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false };
+const VIEW_DEFAULT = { preset: 'all', range: null, acts: [true, true, true, true], q: '', hideNoise: false, publicOnly: false, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false, blockT: 0 };
 function viewString(withRange) {
   const p = new URLSearchParams();
   if (F.q.trim()) p.set('q', F.q.trim());
@@ -1176,6 +1479,7 @@ function viewString(withRange) {
   if (F.dimsChosen) p.set('d', dims); // only lists you picked; automatic picks are redone for each set of logs
   if (F.winChosen) p.set('w', F.newWin);
   if (F.sort) p.set('s', F.sort);
+  if (F.blockT) p.set('bt', F.blockT);
   return p.toString();
 }
 function readView(str) {
@@ -1187,6 +1491,7 @@ function readView(str) {
   if (/^[01]{4}$/.test(p.get('a') || '')) v.acts = [...p.get('a')].map(x => x === '1');
   if (NEW_WIN_KEYS.includes(p.get('w'))) { v.newWin = p.get('w'); v.winChosen = true; }
   v.dimsChosen = p.has('d');
+  if (/^\d{1,3}$/.test(p.get('bt') || '')) v.blockT = +p.get('bt');
   if (/^-?(act|host|in|out|proto|src|cc|spt|dst|dpt|len|ttl|rule)$/.test(p.get('s') || '')) v.sort = p.get('s');
   v.hideNoise = p.get('n') === '1'; v.publicOnly = p.get('p') === '1'; v.oldestFirst = p.get('o') === '1';
   const d = (p.get('d') || '').split(',');
@@ -1195,7 +1500,7 @@ function readView(str) {
 }
 // dimension keys, known before DIMS is defined further down
 const NEW_WIN_KEYS = ['1h', '24h', '7d'];
-const DIM_KEYS = ['src', 'src24', 'cc', 'asn', 'dst', 'dpt', 'spt', 'proto', 'iin', 'iout', 'icmp', 'mac', 'host', 'rule', 'act'];
+const DIM_KEYS = ['src', 'src24', 'cc', 'asn', 'dst', 'dpt', 'spt', 'proto', 'iin', 'iout', 'icmp', 'mac', 'host', 'rule', 'act', 'attack', 'wrule', 'site', 'path', 'status', 'method', 'sev', 'ua'];
 function setView(v) {
   Object.assign(F, v, { page: 0 });
   $('#q').value = F.q; $('#qerr').textContent = '';
@@ -1298,6 +1603,7 @@ function syncPresets() {
   if (F.range) $('#rangeText').textContent = fmtTime(F.range[0]) + ' – ' + fmtTime(F.range[1]);
 }
 $('#rangeClear').onclick = () => { F.range = null; F.page = 0; syncPresets(); apply(); };
+$('#tlSplit').onchange = e => { F.tlSplit = e.target.checked; if (D && D.n) renderTimeline(); };
 $('#hideNoise').onchange = e => { F.hideNoise = e.target.checked; F.page = 0; apply(); };
 $('#publicOnly').onchange = e => { F.publicOnly = e.target.checked; F.page = 0; apply(); };
 
@@ -1350,11 +1656,13 @@ const groupRows = (counts, total) => {
 /* ============================================================ render: tiles */
 function renderAll() {
   hideTip(); syncPresets();
-  namesStatus(); renderTiles(); renderTimeline(); renderMap(); renderNew(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
+  namesStatus(); renderTiles(); renderTimeline(); renderMap(); renderWhatIf(); renderTuning(); renderNew(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
   const f = D.files.map(f => `${f.name} (${fmtN(f.events)}${f.partial ? ', stopped partway' : ''})`).join(', ');
   $('#foot').textContent = `${fmtN(D.n)} events from ${D.files.length} source${D.files.length > 1 ? 's' : ''}: ${f}.` +
     (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') +
-    (D.skipped ? ` ${fmtN(D.skipped)} events skipped while loading (load options).` : '') + ` About ${fmtN(memMB())} MB in memory.` + (D.noTime ? ` ${fmtN(D.noTime)} events have no timestamp (plain dmesg) and are left out of time charts.` : '') +
+    (D.skipped ? ` ${fmtN(D.skipped)} events skipped while loading (load options).` : '') +
+    (D.viaCf ? ` ${fmtN(D.viaCf)} WAF requests came through Cloudflare and are shown with the visitor's real address (CF-Connecting-IP).` : '') +
+    (D.viaProxy ? ` ${fmtN(D.viaProxy)} came through a local proxy and use X-Forwarded-For.` : '') + ` About ${fmtN(memMB())} MB in memory.` + (D.noTime ? ` ${fmtN(D.noTime)} events have no timestamp (plain dmesg) and are left out of time charts.` : '') +
     ` Times shown in your browser's timezone (${BROWSER_TZ})` + (D.kinds.ufw || D.kinds.win ? `; logs without a timezone were read as ${tzLabel()}.` : '.');
 }
 function renderTiles() {
@@ -1386,73 +1694,86 @@ const BINS = [60e3, 300e3, 900e3, 1800e3, 36e5, 108e5, 216e5, 432e5, 864e5, 6048
 let TL = null;
 function renderTimeline() {
   const svg = $('#tl'); svg.textContent = '';
-  const W = Math.max(320, Math.floor(svg.parentElement.getBoundingClientRect().width) - 34), H = 230, padL = 44, padR = 8, padT = 10, padB = 26;
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W);
+  // firewall and WAF on one scale would flatten the smaller one, so when both are loaded they get a panel each
+  const split = !!D.both && F.tlSplit !== false;
+  $('#tlSplitWrap').hidden = !D.both;
+  const W = Math.max(320, Math.floor(svg.parentElement.getBoundingClientRect().width) - 34), padL = 44, padR = 8, padB = 26;
+  const panelH = split ? 110 : 194, padT = split ? 26 : 10, gapP = 30;
+  const H = padT + (split ? 2 * panelH + gapP : panelH) + padB;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W); svg.setAttribute('height', H);
   const c = D.c, n = SEL.length;
   const win = timeWindow();
   let t0 = win ? Math.max(win[0], D.minTs) : D.minTs, t1 = win ? Math.min(win[1], D.maxTs + 1) : D.maxTs + 1;
   if (!(t1 > t0)) { t0 = D.minTs; t1 = D.minTs + 60e3; }
-  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const plotW = W - padL - padR;
   const maxBins = Math.max(20, Math.min(160, Math.floor(plotW / 6)));
   let bin = BINS.find(b => (t1 - t0) / b <= maxBins) || BINS[BINS.length - 1];
   // align bins to local boundaries for bins >= 1h
   const tz = new Date(t0).getTimezoneOffset() * 60e3;
   const start = Math.floor((t0 - tz) / bin) * bin + tz;
   const nb = Math.max(1, Math.ceil((t1 - start) / bin));
-  const counts = new Float64Array(nb * 4);
+  const counts = new Float64Array(nb * 4), cFw = split ? new Float64Array(nb * 4) : null, cWaf = split ? new Float64Array(nb * 4) : null;
   for (let k = 0; k < n; k++) {
     const i = SEL[k], t = c.ts[i]; if (t !== t) continue;
     const b = Math.floor((t - start) / bin); if (b < 0 || b >= nb) continue;
-    counts[b * 4 + D.actGroup[c.act[i]]]++;
+    const g = D.actGroup[c.act[i]];
+    counts[b * 4 + g]++;
+    if (split) (D.actWaf[c.act[i]] ? cWaf : cFw)[b * 4 + g]++;
   }
-  let max = 0;
-  for (let b = 0; b < nb; b++) { const s = counts[b*4] + counts[b*4+1] + counts[b*4+2] + counts[b*4+3]; if (s > max) max = s; }
-  const yMax = niceMax(max || 1);
   const step = plotW / nb;
   const bw = Math.min(24, Math.max(1, step - 2));
   const NS = 'http://www.w3.org/2000/svg';
   const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-  // grid + y ticks
   const gridC = cssVar('--grid'), axisC = cssVar('--axis');
-  for (let g = 0; g <= 4; g++) {
-    const v = yMax * g / 4, y = padT + plotH - plotH * g / 4;
-    svg.append(mk('line', { x1: padL, x2: W - padR, y1: y, y2: y, stroke: g ? gridC : axisC, 'stroke-width': 1, 'shape-rendering': 'crispEdges' }));
-    const tx = mk('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end' }); tx.textContent = yMax >= 1e4 ? compact(v) : fmtN(Math.round(v)); svg.append(tx);
+  const colors = GROUPS.map(g => cssVar(g.css));
+  const gBars = mk('g', {});
+  const panels = split ? [{ label: 'Firewall', top: padT, counts: cFw }, { label: 'WAF', top: padT + panelH + gapP, counts: cWaf }] : [{ top: padT, counts }];
+  for (const P of panels) {
+    let max = 0;
+    for (let b = 0; b < nb; b++) { const s = P.counts[b*4] + P.counts[b*4+1] + P.counts[b*4+2] + P.counts[b*4+3]; if (s > max) max = s; }
+    const yMax = niceMax(max || 1), base = P.top + panelH;
+    if (P.label) { const lt = mk('text', { x: padL, y: P.top - 9, style: 'fill:var(--ink-2);font-size:12px;font-weight:600' }); lt.textContent = P.label; svg.append(lt); }
+    // grid + y ticks (fewer in the short panels)
+    const gl = split ? 2 : 4;
+    for (let g = 0; g <= gl; g++) {
+      const v = yMax * g / gl, y = base - panelH * g / gl;
+      svg.append(mk('line', { x1: padL, x2: W - padR, y1: y, y2: y, stroke: g ? gridC : axisC, 'stroke-width': 1, 'shape-rendering': 'crispEdges' }));
+      const tx = mk('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end' }); tx.textContent = yMax >= 1e4 ? compact(v) : fmtN(Math.round(v)); svg.append(tx);
+    }
+    // bars: BLOCK at baseline, 2px surface gap between segments, rounded top on the last segment
+    for (let b = 0; b < nb; b++) {
+      const x = padL + b * step + (step - bw) / 2;
+      let y = base;
+      const segs = [];
+      for (let g = 0; g < 4; g++) { const v = P.counts[b*4+g]; if (v) segs.push([g, v]); }
+      segs.forEach(([g, v], si) => {
+        let h = v / yMax * panelH;
+        const last = si === segs.length - 1;
+        const gap = si > 0 ? 2 : 0;
+        h = Math.max(h - gap, 1);
+        y -= gap;
+        const top = y - h;
+        const r = last ? Math.min(4, bw / 2, h) : 0;
+        const d = r ? `M${x},${y}V${top + r}Q${x},${top} ${x + r},${top}H${x + bw - r}Q${x + bw},${top} ${x + bw},${top + r}V${y}Z` : `M${x},${y}V${top}H${x + bw}V${y}Z`;
+        gBars.append(mk('path', { d, fill: colors[g] }));
+        y = top;
+      });
+    }
   }
-  // x ticks
+  // x ticks, once, under the last panel
   const nTicks = Math.max(2, Math.min(8, Math.floor(plotW / ((t1 - t0) > 864e5 ? 130 : 90))));
   const every = Math.max(1, Math.ceil(nb / nTicks));
   for (let b = 0; b < nb; b += every) {
     const x = padL + b * step + step / 2;
     const tx = mk('text', { x, y: H - 8, 'text-anchor': 'middle' }); tx.textContent = fmtTick(start + b * bin, bin, t1 - t0); svg.append(tx);
   }
-  // bars: BLOCK at baseline, 2px surface gap between segments, rounded top on the last segment
-  const colors = GROUPS.map(g => cssVar(g.css));
-  const gBars = mk('g', {});
-  for (let b = 0; b < nb; b++) {
-    const x = padL + b * step + (step - bw) / 2;
-    let y = padT + plotH;
-    const segs = [];
-    for (let g = 0; g < 4; g++) { const v = counts[b*4+g]; if (v) segs.push([g, v]); }
-    segs.forEach(([g, v], si) => {
-      let h = v / yMax * plotH;
-      const last = si === segs.length - 1;
-      const gap = si > 0 ? 2 : 0;
-      h = Math.max(h - gap, 1);
-      y -= gap;
-      const top = y - h;
-      const r = last ? Math.min(4, bw / 2, h) : 0;
-      const d = r ? `M${x},${y}V${top + r}Q${x},${top} ${x + r},${top}H${x + bw - r}Q${x + bw},${top} ${x + bw},${top + r}V${y}Z` : `M${x},${y}V${top}H${x + bw}V${y}Z`;
-      gBars.append(mk('path', { d, fill: colors[g] }));
-      y = top;
-    });
-  }
+  const plotH = H - padT - padB;
   svg.append(gBars);
   const cross = mk('line', { y1: padT, y2: padT + plotH, stroke: cssVar('--muted'), 'stroke-width': 1, visibility: 'hidden' });
   const brush = mk('rect', { y: padT, height: plotH, fill: cssVar('--accent'), 'fill-opacity': 0.15, visibility: 'hidden' });
   const hit = mk('rect', { x: padL, y: padT, width: plotW, height: plotH, fill: 'transparent', style: 'cursor:crosshair' });
   svg.append(cross, brush, hit);
-  TL = { padL, step, start, bin, nb, counts, cross, brush, hit, plotW };
+  TL = { padL, step, start, bin, nb, counts, cFw, cWaf, cross, brush, hit, plotW };
   $('#tlSub').textContent = `per ${binName(bin)}`;
   const leg = $('#tlLegend'); leg.textContent = '';
   for (let g = 0; g < 4; g++) {
@@ -1483,7 +1804,9 @@ function fmtTick(t, bin, span) { const d = new Date(t), day = `${MONS[d.getMonth
     TL.cross.setAttribute('x1', cx); TL.cross.setAttribute('x2', cx); TL.cross.setAttribute('visibility', 'visible');
     const cs = [0, 1, 2, 3].map(g => TL.counts[b * 4 + g]);
     const t = TL.start + b * TL.bin;
-    showTip(e, `${fmtTime(t)} – ${fmtTime(t + TL.bin)}`, groupRows(cs, cs[0] + cs[1] + cs[2] + cs[3]).concat(cs.some(Boolean) ? [] : [{ value: '0', label: 'events' }]));
+    const sum = (arr) => arr ? arr[b * 4] + arr[b * 4 + 1] + arr[b * 4 + 2] + arr[b * 4 + 3] : 0;
+    const extra = TL.cFw ? [{ value: fmtN(sum(TL.cFw)), label: 'firewall' }, { value: fmtN(sum(TL.cWaf)), label: 'WAF' }] : [];
+    showTip(e, `${fmtTime(t)} – ${fmtTime(t + TL.bin)}`, groupRows(cs, cs[0] + cs[1] + cs[2] + cs[3]).concat(extra, cs.some(Boolean) ? [] : [{ value: '0', label: 'events' }]));
   });
   svg.addEventListener('pointerup', e => {
     if (!drag) return;
@@ -1594,7 +1917,7 @@ function subnetOf(ip) {
   const p = ip.split('.'); return p.length === 4 ? `${p[0]}.${p[1]}.${p[2]}.0/24` : ip;
 }
 const DIMS = {
-  src:   { label: 'Sources', key: i => D.c.src[i], name: k => D.ip.list[k], tok: k => 'src:' + D.ip.list[k], ip: true },
+  src:   { label: 'Sources', key: i => D.c.src[i], name: k => D.ip.list[k], sub: k => D.both && D.ipSeen[k] === 3 ? 'firewall + WAF' : '', tok: k => 'src:' + D.ip.list[k], ip: true },
   src24: { label: 'Source subnets (/24, /64)', key: i => subnetId(D.c.src[i]), name: k => D.subnet.list[k], tok: k => 'src:' + D.subnet.list[k] },
   cc:    { label: 'Source countries', geo: true, skip: k => k < 0, key: i => D.ipCC[D.c.src[i]], name: k => k < 0 ? '(private / unlocated)' : ccName(D.cc.list[k]), sub: k => k < 0 ? '' : D.cc.list[k], tok: k => k < 0 ? null : 'cc:' + D.cc.list[k] },
   asn:   { label: 'Source networks (ASN)', geo: true, skip: k => k < 0, key: i => D.ipAS[D.c.src[i]], name: k => k < 0 ? '(private / unknown)' : asnLabel(k), sub: k => k < 0 || !D.asnOrg[k] ? '' : D.asn.list[k], tok: k => k < 0 ? null : 'asn:' + D.asnNum[k] },
@@ -1610,6 +1933,14 @@ const DIMS = {
   host:  { label: 'Logging hosts', key: i => D.c.host[i], name: k => D.host.list[k] || '(unknown)', tok: k => D.host.list[k] ? 'host:' + D.host.list[k] : null },
   rule:  { label: 'Firewall rules (OPNsense)', key: i => D.c.rule[i], name: k => ruleName(D.rule.list[k]), sub: k => ruleLabel(D.rule.list[k]) ? D.rule.list[k].slice(0, 8) : '', tok: k => 'rule:' + D.rule.list[k], skip: k => k === 0 },
   act:   { label: 'Actions (exact tag)', key: i => D.c.act[i], name: k => D.act.list[k], tok: k => 'act:' + D.act.list[k].replace(/ /g, '_') },
+  attack: { label: 'Attack types (WAF)', multi: i => D.wcomboCatList[D.c.wr[i]], name: k => D.wcat.list[k], tok: k => 'attack:' + D.wcat.list[k].replace(/ /g, '_') },
+  wrule: { label: 'WAF rules', multi: i => D.wcomboRules[D.c.wr[i]], name: k => D.wmsg.get(D.wrule.list[k]) || 'rule ' + D.wrule.list[k], sub: k => D.wrule.list[k], tok: k => 'wrule:' + D.wrule.list[k], skip: k => isScoreRule(D.wrule.list[k]) },
+  site:  { label: 'Sites (WAF)', key: i => D.c.whost[i], name: k => D.whost.list[k], tok: k => 'site:' + D.whost.list[k], skip: k => k === 0 },
+  path:  { label: 'Requested paths (WAF)', key: i => D.c.path[i], name: k => D.path.list[k], tok: k => /\s/.test(D.path.list[k]) ? null : 'path:' + D.path.list[k], skip: k => k === 0 },
+  status: { label: 'HTTP status (WAF)', key: i => D.c.status[i], name: k => String(k), tok: k => 'status:' + k, skip: k => k < 0 },
+  method: { label: 'HTTP methods (WAF)', key: i => D.c.method[i], name: k => D.method.list[k], tok: k => 'method:' + D.method.list[k], skip: k => k === 0 },
+  sev:   { label: 'Rule severity (WAF)', key: i => D.c.sev[i], name: k => SEV_NAMES[k] || String(k), tok: k => 'sev:' + k, skip: k => k < 0 },
+  ua:    { label: 'User agents (WAF)', key: i => D.c.ua[i], name: k => D.ua.list[k], tok: k => 'ua:' + D.ua.list[k].replace(/\s+/g, '_'), skip: k => k === 0 },
 };
 function subnetId(ipId) {
   if (!D.subnet) { D.subnet = new Intern(); D.subnetOf = new Int32Array(D.ip.list.length).fill(-1); }
@@ -1631,10 +1962,13 @@ function renderRank(id) {
   const box = card.querySelector('.rank'); box.textContent = '';
   const G = D.actGroup, c = D.c;
   const agg = new Map();
+  // multi-valued lists (WAF rules, attack types) count an event once under each of its values
   for (let k = 0; k < SEL.length; k++) {
-    const i = SEL[k], key = dim.key(i);
-    let a = agg.get(key); if (!a) { a = [0, 0, 0, 0, 0]; agg.set(key, a); }
-    a[G[c.act[i]]]++; a[4]++;
+    const i = SEL[k], g = G[c.act[i]];
+    for (const key of dim.multi ? dim.multi(i) : [dim.key(i)]) {
+      let a = agg.get(key); if (!a) { a = [0, 0, 0, 0, 0]; agg.set(key, a); }
+      a[g]++; a[4]++;
+    }
   }
   let rows = [...agg].filter(([k]) => !(dim.skip && dim.skip(k))).sort((x, y) => y[1][4] - x[1][4]);
   const total = rows.reduce((s, r) => s + r[1][4], 0);
@@ -1676,6 +2010,7 @@ function renderRank(id) {
 // A list you picked yourself (or that came from a bookmarked address) is kept, unless it can't show
 // anything for these logs (rules without OPNsense, countries without GeoIP ...).
 function dimApplies(k) {
+  if (['attack', 'wrule', 'site', 'path', 'status', 'method', 'sev', 'ua'].includes(k)) return D.waf;
   if (k === 'rule') return D.hasRules;
   if (k === 'cc') return D.geo && D.cc.list.length > 0;
   if (k === 'asn') return D.geo && D.asn.list.length > 0;
@@ -1686,7 +2021,10 @@ function dimApplies(k) {
 function autoView() {
   const kinds = Object.keys(D.kinds).length, hosts = D.host.list.filter(Boolean).length;
   // A: who, B: what. Mixed logs or several machines: split by machine first.
-  const auto = kinds > 1 || hosts > 1 ? { dimA: 'host', dimB: 'dpt' }
+  const packets = D.kinds.ufw || D.kinds.opn || D.kinds.win;
+  const auto = D.waf && !packets ? { dimA: 'src', dimB: 'attack' }
+    : D.waf ? { dimA: 'src', dimB: 'host' }
+    : kinds > 1 || hosts > 1 ? { dimA: 'host', dimB: 'dpt' }
     : D.kinds.opn && D.hasRules ? { dimA: 'src', dimB: 'rule' }
     : { dimA: 'src', dimB: 'dpt' };
   auto.dimC = dimApplies('asn') ? 'asn' : dimApplies('cc') ? 'cc' : 'asn';
@@ -1754,6 +2092,183 @@ function renderMap() {
   $('#geoSub').textContent = `${fmtN(shown)} events from ${countries} countries` + (unloc ? `; ${fmtN(unloc)} from private or unlocated sources not shown` : '') + (D.geoDemoUsed ? '. Sample data: locations are made up.' : '');
   renderRank('C');
 }
+
+/* The WAF rows in the current selection, the effective thresholds, and a test for "possibly legitimate":
+   your own or LAN addresses, verified crawlers, or requests that tripped only protocol-policy rules. */
+function wafContext() {
+  const c = D.c, rows = [];
+  for (const i of SEL) if (D.actWaf[c.act[i]]) rows.push(i);
+  const cfgIn = modeOf(D.cfgIn), cfgOut = modeOf(D.cfgOut) ?? 4;
+  const T = F.blockT || cfgIn || 5;
+  // what counts as possibly legitimate
+  const servers = new Set(); for (const i of rows) servers.add(c.dst[i]);
+  // a source is a crawler when the user agent it mostly sends is one (scanners sometimes borrow a bot's name)
+  const srcUa = new Map(); for (const i of rows) { let m = srcUa.get(c.src[i]); if (!m) srcUa.set(c.src[i], m = new Map()); m.set(c.ua[i], (m.get(c.ua[i]) || 0) + 1); }
+  const crawlerSrc = new Set(); for (const [src, m] of srcUa) if (crawlerKind(src, D.ua.list[modeOf(m)] || '', m) === 'crawler') crawlerSrc.add(src);
+  // tripped only protocol / method policy rules (911, 920), no attack rules: the usual false positives
+  const policyOnly = new Uint8Array(D.wcombo.list.length);
+  D.wcomboRules.forEach((rs, ci) => { const det = rs.map(r => D.wrule.list[r]).filter(id => !isScoreRule(id)); policyOnly[ci] = det.length && det.every(id => /^9(11|20)\d{3}$/.test(id)) ? 1 : 0; });
+  const why = i => (D.ipc[c.src[i]] & 1) || servers.has(c.src[i]) ? 'own' : crawlerSrc.has(c.src[i]) ? 'crawler' : policyOnly[c.wr[i]] ? 'policy' : '';
+  const wouldBlock = (i, t) => c.score[i] >= t || (c.oscore[i] >= 0 && c.oscore[i] >= cfgOut);
+  return { c, rows, cfgIn, cfgOut, T, why, wouldBlock, srcUa, servers, crawlerSrc };
+}
+
+/* ============================================================ render: what blocking mode would do (WAF)
+   Which logged requests a given inbound threshold would block, and which of those look legitimate:
+   your own or LAN addresses, verified crawlers, and requests that tripped only protocol-policy rules (see wafContext). */
+const WI_TH = [3, 5, 7, 10, 15, 20, 25, 50];
+const topOf = m => [...m].sort((a, b) => b[1] - a[1]);
+const modeOf = m => topOf(m)[0]?.[0];
+function renderWhatIf() {
+  const card = $('#whatifCard');
+  card.hidden = !D.waf;
+  if (!D.waf) return;
+  const { c, rows, cfgIn, cfgOut, T, why, wouldBlock, srcUa } = wafContext();
+  const ths = [...new Set(WI_TH.concat(cfgIn ? [cfgIn] : [], [T]))].sort((a, b) => a - b);
+  const tb = $('#wiTable'); tb.textContent = '';
+  const hr = el('tr'); for (const h of ['Inbound threshold', 'Would block', 'Sources', 'Possibly legitimate']) hr.append(el('th', null, h)); tb.append(hr);
+  const total = rows.length;
+  for (const t of ths) {
+    let n = 0, legit = 0; const srcs = new Set(), lsrcs = new Set();
+    for (const i of rows) if (wouldBlock(i, t)) { n++; srcs.add(c.src[i]); if (why(i)) { legit++; lsrcs.add(c.src[i]); } }
+    const tr = el('tr', 'pick' + (t === T ? ' sel' : ''));
+    const lbl = el('td', null, String(t)); if (t === cfgIn) lbl.append(el('span', 'why', 'your setting')); else if (t === 5) lbl.append(el('span', 'why', 'CRS default'));
+    const nb = el('td', null, `${fmtN(n)} (${total ? (100 * n / total).toFixed(0) : 0}%)`); const bar = el('span', 'wi-bar'); bar.style.width = (total ? Math.max(1, 70 * n / total) : 0) + 'px'; nb.append(bar);
+    tr.append(lbl, nb, el('td', null, fmtN(srcs.size)), el('td', null, legit ? `${fmtN(legit)} from ${fmtN(lsrcs.size)} source${lsrcs.size === 1 ? '' : 's'}` : 'none'));
+    const pickT = () => { F.blockT = t === (cfgIn || 5) ? 0 : t; renderWhatIf(); renderTuning(); saveView(); };
+    tr.onclick = pickT; keyable(tr, `Threshold ${t}: would block ${fmtN(n)} requests`, pickT);
+    tb.append(tr);
+  }
+  // detail for the chosen threshold
+  const det = $('#wiDetail'); det.textContent = '';
+  const blocked = rows.filter(i => wouldBlock(i, T));
+  const groups = { own: { title: 'Your own or LAN addresses', m: new Map() }, crawler: { title: 'Known crawlers (by user agent; checked against their network when an ASN database is loaded)', m: new Map() }, policy: { title: 'Only protocol-policy rules, no attack rules (e.g. a bare IP as Host)', m: new Map() } };
+  const ruleN = new Map(); let byOut = 0;
+  for (const i of blocked) {
+    const w = why(i); if (w) groups[w].m.set(c.src[i], (groups[w].m.get(c.src[i]) || 0) + 1);
+    if (c.score[i] < T) byOut++;
+    for (const r of D.wcomboRules[c.wr[i]] || []) if (!isScoreRule(D.wrule.list[r])) ruleN.set(r, (ruleN.get(r) || 0) + 1);
+  }
+  const head = el('h3', null, `At threshold ${T}: `); head.append(el('b', null, `${fmtN(blocked.length)} blocked`));
+  if (byOut) head.append(` (${fmtN(byOut)} of them by outbound rules, threshold ${cfgOut})`);
+  det.append(head);
+  const inb = blocked.length - byOut;
+  const show = el('button', null, `Show the ${fmtN(inb)} over the inbound threshold`); show.onclick = () => addToken(`score:${T}-32767`); show.title = 'Filters the dashboard to requests whose inbound score is at or above this threshold (score: filter). Outbound blocks are not included.';
+  det.append(show);
+  for (const g of Object.values(groups)) {
+    if (!g.m.size) continue;
+    const sec = el('section'); const h = el('h3', null, g.title + ' '); h.append(el('b', null, fmtN([...g.m.values()].reduce((a, b) => a + b, 0)))); sec.append(h);
+    for (const [src, n] of topOf(g.m).slice(0, 4)) {
+      const row = el('div', 'newrow'); const lbl = el('span', 'nl', D.ip.list[src]);
+      const ua = modeOf(srcUa.get(src) || new Map());
+      if (D.ua.list[ua]) lbl.append(' ', el('small', null, D.ua.list[ua].slice(0, 50)));
+      row.append(lbl, el('span', 'nc', fmtN(n)));
+      row.onclick = e => addToken('src:' + D.ip.list[src], e.shiftKey); keyable(row, `${D.ip.list[src]}: ${fmtN(n)} requests`, e => addToken('src:' + D.ip.list[src], e.shiftKey));
+      sec.append(row);
+    }
+    det.append(sec);
+  }
+  if (ruleN.size) {
+    const sec = el('section'); sec.append(el('h3', null, 'Rules behind these blocks'));
+    for (const [r, n] of topOf(ruleN).slice(0, 5)) {
+      const id = D.wrule.list[r], row = el('div', 'newrow'), lbl = el('span', 'nl', D.wmsg.get(id) || 'rule ' + id); lbl.append(' ', el('small', null, id));
+      row.append(lbl, el('span', 'nc', fmtN(n)));
+      row.onclick = e => addToken('wrule:' + id, e.shiftKey); keyable(row, `Rule ${id}: ${fmtN(n)}`, e => addToken('wrule:' + id, e.shiftKey));
+      sec.append(row);
+    }
+    det.append(sec);
+  }
+  const mode = D.act.list.some(a => a === 'WAF BLOCK') ? '' : 'Nothing in these logs was actually blocked (detection-only mode), so this is what blocking mode would have done. ';
+  $('#wiSub').textContent = `${fmtN(total)} WAF requests in this filter`;
+  const note = $('#wiNote');
+  note.hidden = !(mode || D.scoreEst);
+  note.textContent = mode + (D.scoreEst ? `${fmtN(D.scoreEst)} requests had no anomaly score in the log, so theirs is estimated from rule severities.` : '');
+}
+
+/* ============================================================ render: tuning suggestions (WAF false positives)
+   For each detecting rule and scope (first path segment, or your own/LAN addresses): how many hits came from
+   verified crawlers or your own addresses. Where that's most of them, excluding the rule there is a candidate;
+   the blast radius re-scores each affected request without that rule's weight (CRS: critical 5, error 4,
+   warning 3, notice 2) and counts what would no longer reach the threshold. */
+const CRS_WEIGHT = [5, 5, 5, 4, 3, 2];
+let TUNE = [];
+function pathScope(p) {
+  const m = /^\/[^/?]+/.exec(p || '/');
+  if (!m) return '/';
+  return p.length > m[0].length && p[m[0].length] === '/' ? m[0] + '/' : m[0];
+}
+function renderTuning() {
+  const card = $('#tuneCard');
+  card.hidden = !D.waf;
+  if (!D.waf) return;
+  const { c, rows, cfgOut, T, why, wouldBlock } = wafContext();
+  const agg = new Map();
+  const add = (key, rule, scope, kind, i, legit) => {
+    let a = agg.get(key); if (!a) agg.set(key, a = { rule, scope, kind, hits: 0, legit: 0, rows: [], srcs: new Set() });
+    a.hits++; if (legit) a.legit++; a.rows.push(i); if (kind === 'own') a.srcs.add(c.src[i]);
+  };
+  const pathScopeOf = new Map();
+  for (const i of rows) {
+    const w = why(i), legit = w === 'crawler' || w === 'own';
+    let ps = pathScopeOf.get(c.path[i]); if (ps === undefined) pathScopeOf.set(c.path[i], ps = pathScope(D.path.list[c.path[i]]));
+    for (const r of D.wcomboRules[c.wr[i]] || []) {
+      const id = D.wrule.list[r]; if (isScoreRule(id)) continue;
+      add(`${id}|p|${ps}`, id, ps, 'path', i, legit);
+      if (w === 'own') add(`${id}|own`, id, 'your own / LAN addresses', 'own', i, true);
+    }
+  }
+  const out = [];
+  for (const a of agg.values()) {
+    if (a.hits < (a.kind === 'own' ? 5 : 20) || a.legit / a.hits < 0.7) continue;
+    const wt = CRS_WEIGHT[D.wruleSev.get(a.rule) ?? 2] ?? 0, outbound = /^95\d{4}$/.test(a.rule);
+    let uLegit = 0, uOther = 0;
+    for (const i of a.rows) {
+      if (!wouldBlock(i, T)) continue;
+      const ins = c.score[i] - (outbound ? 0 : wt), outs = c.oscore[i] - (outbound ? wt : 0);
+      if (ins >= T || (c.oscore[i] >= 0 && outs >= cfgOut)) continue;
+      if (why(i)) uLegit++; else uOther++;
+    }
+    out.push(Object.assign(a, { wt, uLegit, uOther }));
+  }
+  // candidates that change nothing at this threshold (the rule's weight alone never reaches it) only cut log noise
+  const noiseOnly = out.filter(a => !a.uLegit).length;
+  const useful = out.filter(a => a.uLegit).sort((x, y) => y.uLegit - x.uLegit || y.legit - x.legit);
+  const verdict = a => !a.uOther ? 'clean' : a.uOther * 10 <= a.uLegit ? 'mostly clean' : 'trade-off';
+  useful.forEach(a => a.verdict = verdict(a));
+  TUNE = useful.slice(0, 10);
+  const tb = $('#tuneTable'); tb.textContent = '';
+  $('#tuneSub').textContent = (TUNE.length ? `${TUNE.length} candidate${TUNE.length > 1 ? 's' : ''} at threshold ${T}` : '') + (noiseOnly ? `${TUNE.length ? '; ' : ''}${fmtN(noiseOnly)} more would only cut log noise (no change in what's blocked)` : '');
+  $('#btnTune').disabled = !TUNE.length;
+  if (!TUNE.length) { const tr = el('tr'); tr.append(el('td', null, noiseOnly ? `Nothing here would change what's blocked at threshold ${T}.` : 'No rule fires mostly on crawler or own-address traffic in this filter.')); tb.append(tr); return; }
+  const hr = el('tr'); for (const h of ['Rule', 'Where', 'Hits', 'From crawlers / own', `Unblocks at ${T}: legit · other`, '']) hr.append(el('th', null, h)); tb.append(hr);
+  for (const a of TUNE) {
+    const tr = el('tr', 'clk');
+    const rl = el('td'); rl.append(el('span', 'mono', a.rule + ' ')); rl.append(el('span', 'why', D.wmsg.get(a.rule) || '')); rl.title = D.wmsg.get(a.rule) || '';
+    const where = el('td', 'mono', a.kind === 'path' ? a.scope + (a.scope.endsWith('/') ? '…' : '') : `${a.scope} (${fmtN(a.srcs.size)})`);
+    const vd = el('td'); const vb = el('span', 'pat', a.verdict); vb.title = a.verdict === 'clean' ? 'Lets no other requests through' : a.verdict === 'mostly clean' ? 'Lets a few other requests through (under 10% of what it unblocks)' : 'Also lets a sizeable number of other, likely hostile, requests through: consider a narrower path'; vd.append(vb);
+    tr.append(rl, where, el('td', null, fmtN(a.hits)), el('td', null, `${fmtN(a.legit)} (${(100 * a.legit / a.hits).toFixed(0)}%)`), el('td', null, `${fmtN(a.uLegit)} · ${fmtN(a.uOther)}`), vd);
+    const go = e => { addToken('wrule:' + a.rule, false); if (a.kind === 'path') addToken('path:' + a.scope + (a.scope.endsWith('/') ? '*' : ''), e.shiftKey); };
+    tr.onclick = go; keyable(tr, `Rule ${a.rule} on ${a.scope}: ${fmtN(a.hits)} hits`, go);
+    tb.append(tr);
+  }
+}
+$('#btnTune').onclick = () => {
+  const { T } = wafContext();
+  const lines = ['# fwscope: drafted ModSecurity exclusions for OWASP CRS. Review every one before using it.',
+    '# Put them in your "before CRS" exclusions file (e.g. REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf), reload,',
+    '# and watch the logs. The ids 1000100+ are placeholders: use ids that are free in your setup.',
+    '# Scoping by path is safer than by user agent, which anyone can fake. Crawler addresses change, so', '# address-scoped exclusions are only drafted for your own / LAN addresses.', ''];
+  TUNE.forEach((a, k) => {
+    lines.push(`# ${a.rule} ${D.wmsg.get(a.rule) || ''}`.trimEnd());
+    lines.push(`#   ${a.kind === 'path' ? 'on ' + a.scope : 'from ' + a.scope}: ${fmtN(a.hits)} hits, ${(100 * a.legit / a.hits).toFixed(0)}% from verified crawlers or your own addresses.`);
+    lines.push(`#   At threshold ${T} this stops blocking ${fmtN(a.uLegit)} possibly legitimate and ${fmtN(a.uOther)} other request(s): ${a.verdict}.`);
+    if (a.verdict === 'trade-off') lines.push('#   TRADE-OFF: it also lets likely attacks through. Consider a narrower path, or leave it.');
+    if (a.kind === 'path') lines.push(`SecRule REQUEST_FILENAME "@beginsWith ${a.scope}" \\\n    "id:${1000100 + k},phase:1,pass,t:none,nolog,ctl:ruleRemoveById=${a.rule}"`);
+    else lines.push(`SecRule REMOTE_ADDR "@ipMatch ${[...a.srcs].map(x => D.ip.list[x]).join(',')}" \\\n    "id:${1000100 + k},phase:1,pass,t:none,nolog,ctl:ruleRemoveById=${a.rule}"`);
+    lines.push('');
+  });
+  showOut('Drafted ModSecurity exclusions', 'Drafts only: each one switches a rule off for a path or address range, so read what it would let through before using it. Nothing is changed on your server from here.', lines.join('\n'), 'fwscope-exclusions.conf');
+};
 
 /* ============================================================ render: new in the last hour / day / week */
 const NEW_WIN = { '1h': 36e5, '24h': 864e5, '7d': 6048e5 };
@@ -1856,6 +2371,10 @@ const PATTERNS = {
   'port scan': '5 or more different ports',
   'host sweep': 'one or two ports across 10+ of your addresses: looking for any machine running that service',
   'hammering': '100+ hits, at least 80% on one port: brute force or a stuck client',
+  'web scan': '20+ different paths on your web server: a vulnerability or content scanner',
+  'crawler': 'many pages, from a known search-engine or SEO crawler (going by its user agent, which can be faked)',
+  'fake crawler': 'claims to be a big crawler but comes from a network that crawler never uses, or keeps switching which crawler it claims to be: a scanner in disguise',
+  'web hammering': '50+ requests, at least 80% to one path: login brute force or a flood',
 };
 // How long the source took to touch most of its ports: the span between the 5th and 95th percentile of
 // each port's first hit. Stray hits days before or after a sweep don't stretch a 3-minute scan into days.
@@ -1878,28 +2397,44 @@ function scanPattern(s) {
 }
 function renderScans() {
   const c = D.c, G = D.actGroup, ipc = D.ipc;
-  const m = new Map();
+  const m = new Map(), web = new Map();
   // only blocked / rate-limited traffic, and not LAN multicast or broadcast chatter
   for (let k = 0; k < SEL.length; k++) {
-    const i = SEL[k], p = c.dpt[i]; if (p < 0 || G[c.act[i]] > 1 || (ipc[c.dst[i]] & 6)) continue;
+    const i = SEL[k];
+    if (D.waf && D.actWaf[c.act[i]]) { // WAF row: count paths instead of ports
+      let w = web.get(c.src[i]); if (!w) { w = { web: true, ports: new Map(), dsts: new Set(), uas: new Map(), n: 0, first: Infinity, last: -Infinity }; web.set(c.src[i], w); }
+      w.uas.set(c.ua[i], (w.uas.get(c.ua[i]) || 0) + 1);
+      const t = c.ts[i], v = w.ports.get(c.path[i]); if (v) v.n++; else w.ports.set(c.path[i], { n: 1, t }); w.n++;
+      if (t === t) { if (t < w.first) w.first = t; if (t > w.last) w.last = t; }
+      continue;
+    }
+    const p = c.dpt[i]; if (p < 0 || G[c.act[i]] > 1 || (ipc[c.dst[i]] & 6)) continue;
     let s = m.get(c.src[i]); if (!s) { s = { ports: new Map(), dsts: new Set(), n: 0, first: Infinity, last: -Infinity }; m.set(c.src[i], s); }
     const t0 = c.ts[i]; const v = s.ports.get(p); if (v) v.n++; else s.ports.set(p, { n: 1, t: t0 }); s.n++;
     if (s.dsts.size < 64) s.dsts.add(c.dst[i]);
     const t = c.ts[i]; if (t === t) { if (t < s.first) s.first = t; if (t > s.last) s.last = t; }
   }
-  const all = [...m].map(([src, s]) => [src, s, scanPattern(s)]).filter(r => r[2]);
-  const isFocused = r => r[2] === 'hammering' || r[2] === 'host sweep';
+  // crawlers announce themselves; scanner tools that call themselves "bot" are not crawlers
+  const CRAWLER = CRAWLER_UA, SCANNER = SCANNER_UA;
+  const crawlerOf = (src, w) => { const [ua] = [...w.uas].sort((a, b) => b[1] - a[1])[0] || [0]; return crawlerKind(src, D.ua.list[ua] || '', w.uas); };
+  const webPattern = (src, w) => { let top = 0; for (const v of w.ports.values()) if (v.n > top) top = v.n; if (w.n >= 50 && top >= 0.8 * w.n) return 'web hammering'; if (w.ports.size < 20) return ''; const k = crawlerOf(src, w); return k === 'crawler' ? 'crawler' : k === 'fake' ? 'fake crawler' : 'web scan'; };
+  const all = [...m].map(([src, s]) => [src, s, scanPattern(s)]).concat([...web].map(([src, w]) => [src, w, webPattern(src, w)])).filter(r => r[2]);
+  const isFocused = r => r[2] === 'hammering' || r[2] === 'host sweep' || r[2] === 'web hammering' || r[2] === 'crawler';
   const scans = all.filter(r => !isFocused(r)).sort((a, b) => b[1].ports.size - a[1].ports.size || b[1].n - a[1].n).slice(0, 8);
-  const focused = all.filter(isFocused).sort((a, b) => b[1].n - a[1].n).slice(0, 4);
-  const rows = scans.concat(focused);
+  const focused = all.filter(r => isFocused(r) && r[2] !== 'crawler').sort((a, b) => b[1].n - a[1].n).slice(0, 6);
+  const crawlers = all.filter(r => r[2] === 'crawler').sort((a, b) => b[1].n - a[1].n).slice(0, 3); // last: usually harmless
+  const rows = scans.concat(focused, crawlers);
   const tb = $('#scan'); tb.textContent = '';
   if (!rows.length) { const tr = el('tr'); tr.append(el('td', null, 'No scanning or hammering sources among the blocked events in this filter.')); tb.append(tr); return; }
-  const hr = el('tr'); for (const h of ['Source', ...(D.geo ? ['Network'] : []), 'Pattern', 'Ports', 'Events', 'Over', 'Sample']) hr.append(el('th', null, h)); tb.append(hr);
+  const hr = el('tr'); for (const h of ['Source', ...(D.geo ? ['Network'] : []), 'Pattern', D.waf ? 'Ports / paths' : 'Ports', 'Events', 'Over', 'Sample']) hr.append(el('th', null, h)); tb.append(hr);
   for (const [src, s, pat] of rows) {
     const tr = el('tr', 'clk');
     const ports = [...s.ports.keys()].sort((a, b) => a - b);
     let sample;
-    if (pat === 'hammering' || pat === 'host sweep') {
+    if (s.web) {
+      const top = [...s.ports].sort((a, b) => b[1].n - a[1].n).slice(0, 3).map(([pid, v]) => `${D.path.list[pid] || '/'} ×${fmtN(v.n)}`);
+      sample = top.join(', ');
+    } else if (pat === 'hammering' || pat === 'host sweep') {
       const [top, { n }] = [...s.ports].sort((a, b) => b[1].n - a[1].n)[0];
       sample = pat === 'host sweep' ? `${top}${svcName(top) ? ' ' + svcName(top) : ''} → ${s.dsts.size >= 64 ? '64+' : s.dsts.size} addresses` : `${top}${svcName(top) ? ' ' + svcName(top) : ''} ×${fmtN(n)}`;
     } else sample = ports.slice(0, 6).join(', ') + (ports.length > 6 ? ', …' : '');
@@ -1908,7 +2443,7 @@ function renderScans() {
     const pd = el('td'); const pb = el('span', 'pat', pat); pb.title = PATTERNS[pat]; pd.append(pb); tr.append(pd);
     // for scans, "over" is how long the sweep itself took; the full first-to-last span is on hover
     const full = s.last >= s.first ? fmtDur(s.last - s.first) : '—';
-    const sweep = !isFocused([src, s, pat]) && s.ports.size >= 5;
+    const sweep = !s.web && !isFocused([src, s, pat]) && s.ports.size >= 5;
     const over = el('td', null, sweep ? fmtDur(s.span) : full);
     over.title = sweep ? `Most of its ports were hit within ${fmtDur(s.span)}; first to last hit: ${full}` : `First to last hit: ${full}`;
     tr.append(el('td', null, fmtN(s.ports.size)), el('td', null, fmtN(s.n)), over, el('td', 'mono', sample));
@@ -1931,21 +2466,26 @@ function ipRank() {
   for (let i = 0; i < D.ip.list.length; i++) if (!D.ip.list[i]) D.ipRank[i] = -1;
   return D.ipRank;
 }
+const hasPackets = () => !D.waf || D.kinds.ufw || D.kinds.opn || D.kinds.win;
 const EV_COLS = [
   { id: 'time', label: 'Time' },
   { id: 'act', label: 'Action', rank: () => { const r = byLabel(D.act.list, i => D.act.list[i]); return i => r[D.c.act[i]]; } },
   { id: 'host', label: 'Host', when: () => D.host.list.length > 2, rank: () => { const r = byLabel(D.host.list, i => D.host.list[i] || '￿'); return i => D.c.host[i] ? r[D.c.host[i]] : -1; } },
-  { id: 'in', label: 'In', rank: () => { const r = byLabel(D.iface.list, i => ifLabel(D.iface.list[i]) || D.iface.list[i]); return i => D.c.iin[i] ? r[D.c.iin[i]] : -1; } },
-  { id: 'out', label: 'Out', rank: () => { const r = byLabel(D.iface.list, i => ifLabel(D.iface.list[i]) || D.iface.list[i]); return i => D.c.iout[i] ? r[D.c.iout[i]] : -1; } },
+  { id: 'in', label: 'In', when: hasPackets, rank: () => { const r = byLabel(D.iface.list, i => ifLabel(D.iface.list[i]) || D.iface.list[i]); return i => D.c.iin[i] ? r[D.c.iin[i]] : -1; } },
+  { id: 'out', label: 'Out', when: hasPackets, rank: () => { const r = byLabel(D.iface.list, i => ifLabel(D.iface.list[i]) || D.iface.list[i]); return i => D.c.iout[i] ? r[D.c.iout[i]] : -1; } },
   { id: 'proto', label: 'Proto', rank: () => { const r = byLabel(D.proto.list, i => D.proto.list[i]); return i => r[D.c.proto[i]]; } },
   { id: 'src', label: 'Source', rank: () => { const r = ipRank(); return i => r[D.c.src[i]]; } },
   { id: 'cc', label: 'CC', when: () => D.geo, rank: () => { const r = byLabel(D.cc.list, i => D.cc.list[i]); return i => { const x = D.ipCC[D.c.src[i]]; return x >= 0 ? r[x] : -1; }; } },
   { id: 'spt', label: 'SPT', rank: () => i => D.c.spt[i] },
   { id: 'dst', label: 'Destination', rank: () => { const r = ipRank(); return i => r[D.c.dst[i]]; } },
   { id: 'dpt', label: 'DPT', rank: () => i => D.c.dpt[i] },
-  { id: 'len', label: 'Len', rank: () => i => D.c.len[i] },
-  { id: 'ttl', label: 'TTL', rank: () => i => D.c.ttl[i] },
-  { id: 'flags', label: 'Flags / ICMP' },
+  { id: 'len', label: 'Len', when: hasPackets, rank: () => i => D.c.len[i] },
+  { id: 'ttl', label: 'TTL', when: hasPackets, rank: () => i => D.c.ttl[i] },
+  { id: 'flags', label: 'Flags / ICMP', when: hasPackets },
+  { id: 'site', label: 'Site', when: () => D.waf, rank: () => { const r = byLabel(D.whost.list, i => D.whost.list[i]); return i => D.c.whost[i] ? r[D.c.whost[i]] : -1; } },
+  { id: 'req', label: 'Request', when: () => D.waf, rank: () => { const r = byLabel(D.uri.list, i => D.uri.list[i], true); return i => D.c.uri[i] ? r[D.c.uri[i]] : -1; } },
+  { id: 'status', label: 'Status', when: () => D.waf, rank: () => i => D.c.status[i] },
+  { id: 'wrules', label: 'WAF rules', when: () => D.waf, rank: () => i => D.c.score[i] },
   { id: 'rule', label: 'Rule', when: () => D.hasRules, rank: () => { const r = byLabel(D.rule.list, i => D.rule.list[i] ? ruleName(D.rule.list[i]) : '￿'); return i => D.c.rule[i] ? r[D.c.rule[i]] : -1; } },
 ];
 let EVCACHE = null;
@@ -1981,6 +2521,14 @@ function eventLine(i) {
   if (c.ttl[i] >= 0) parts.push('ttl=' + c.ttl[i]);
   if (c.flags[i]) parts.push('flags=' + flagStr(c.flags[i]).replace(/ /g, ','));
   if (proto.startsWith('ICMP') && c.itype[i] >= 0) parts.push(`icmp=${c.itype[i]}/${c.icode[i]}`);
+  if (D.waf && c.wr[i]) {
+    if (D.whost.list[c.whost[i]]) parts.push('site=' + D.whost.list[c.whost[i]]);
+    parts.push(`"${D.method.list[c.method[i]] || '-'} ${D.uri.list[c.uri[i]] || '-'}"`);
+    if (c.status[i] >= 0) parts.push('status=' + c.status[i]);
+    parts.push('waf_rules=' + D.wcombo.list[c.wr[i]]);
+    if (c.score[i] >= 0) parts.push('score=' + c.score[i]);
+    if (D.ua.list[c.ua[i]]) parts.push(`ua="${D.ua.list[c.ua[i]]}"`);
+  }
   const rs = D.rule.list[c.rule[i]]; if (rs) parts.push(`rule=${rs}${ruleLabel(rs) ? ' "' + ruleLabel(rs) + '"' : ''}`);
   return parts.join(' ');
 }
@@ -2039,6 +2587,16 @@ function renderEvents() {
       case 'len': td(c.len[i] >= 0 ? String(c.len[i]) : ''); break;
       case 'ttl': td(c.ttl[i] >= 0 ? String(c.ttl[i]) : ''); break;
       case 'flags': { let extra = flagStr(c.flags[i]); if (proto.startsWith('ICMP') && c.itype[i] >= 0) extra = `type ${c.itype[i]}/${c.icode[i]} ${icmpName(proto, c.itype[i])}`; td(extra, 'mono'); break; }
+      case 'site': { const h = D.whost.list[c.whost[i]]; td(h, null, h ? 'site:' + h : null); break; }
+      case 'req': { const u = D.uri.list[c.uri[i]], m = D.method.list[c.method[i]], pth = D.path.list[c.path[i]]; const d = td(u ? (m ? m + ' ' : '') + (u.length > 70 ? u.slice(0, 69) + '…' : u) : '', 'mono', pth && !/\s/.test(pth) ? 'path:' + pth : null); if (u) d.title = u; break; }
+      case 'status': td(c.status[i] >= 0 ? String(c.status[i]) : '', null, c.status[i] >= 0 ? 'status:' + c.status[i] : null); break;
+      case 'wrules': {
+        const rs = D.wcomboRules[c.wr[i]] || [], cats = (D.wcomboCatList[c.wr[i]] || []).map(x => D.wcat.list[x]);
+        const main = rs.map(r => D.wrule.list[r]).find(id => !isScoreRule(id)) || (rs[0] !== undefined ? D.wrule.list[rs[0]] : '');
+        const d = td(rs.length ? (cats.join(', ') || 'rule ' + main) + (c.score[i] >= 0 ? ` · score ${c.score[i]}` : '') : '', null, main ? 'wrule:' + main : null);
+        if (rs.length) d.title = rs.map(r => `${D.wrule.list[r]} ${D.wmsg.get(D.wrule.list[r]) || ''}`).join('\n');
+        break;
+      }
       case 'rule': { const rs = D.rule.list[c.rule[i]]; const d = td(rs ? ruleName(rs) : '', 'mono', rs ? 'rule:' + rs : null); if (rs) d.title = rs; break; }
     }
     tb.append(tr);
@@ -2106,6 +2664,11 @@ function abuseLine(i) {
   let s = `${utc(c.ts[i])}  ${D.act.list[c.act[i]].padEnd(11)} ${proto.padEnd(5)} ${ep(D.ip.list[c.src[i]], c.spt[i])} -> ${ep(D.ip.list[c.dst[i]], c.dpt[i])}`;
   if (c.flags[i] & ~FLAGS.DF) s += '  ' + flagStr(c.flags[i] & ~FLAGS.DF);
   if (proto.startsWith('ICMP') && c.itype[i] >= 0) s += `  icmp ${c.itype[i]}/${c.icode[i]} ${icmpName(proto, c.itype[i])}`;
+  if (D.waf && c.wr[i]) {
+    const site = D.whost.list[c.whost[i]];
+    s += `  "${D.method.list[c.method[i]] || '-'} ${D.uri.list[c.uri[i]] || '-'}"${site ? ' Host: ' + site : ''}${c.status[i] >= 0 ? ' -> ' + c.status[i] : ''}`;
+    s += '  rules ' + (D.wcomboRules[c.wr[i]] || []).map(r => D.wrule.list[r]).join(',');
+  }
   return s;
 }
 function abuseSource() {
@@ -2143,9 +2706,23 @@ function abuseReport() {
     'host sweep': `a sweep of port ${tp}${svc(tp) ? ' (' + svc(tp) + ')' : ''} across ${s.dsts.size >= 64 ? '64 or more' : s.dsts.size} of our addresses`,
     'hammering': `${fmtN(tn)} repeated connection attempts to port ${tp}${svc(tp) ? ' (' + svc(tp) + ')' : ''}` + (LOGIN_PORTS[tp] ? ', consistent with brute-force login attempts' : ''),
   }[pat] || `connection attempts to ${topPorts.length === 1 ? 'port ' + tp : fmtN(topPorts.length) + ' different ports'}`;
+  // WAF rows: describe the HTTP attacks instead of (or on top of) the port activity
+  let wafN = 0; const wcats = new Map(), wsites = new Map(), wpaths = new Map(), wuas = new Map();
+  if (D.waf) for (const i of SEL) {
+    if (!D.actWaf[c.act[i]]) continue;
+    wafN++;
+    for (const x of D.wcomboCatList[c.wr[i]] || []) wcats.set(D.wcat.list[x], (wcats.get(D.wcat.list[x]) || 0) + 1);
+    const site = D.whost.list[c.whost[i]], pth = D.path.list[c.path[i]], ua = D.ua.list[c.ua[i]];
+    if (site) wsites.set(site, (wsites.get(site) || 0) + 1);
+    if (pth) wpaths.set(pth, (wpaths.get(pth) || 0) + 1);
+    if (ua) wuas.set(ua, (wuas.get(ua) || 0) + 1);
+  }
+  const topList = (mp, n) => [...mp].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${k} ×${fmtN(v)}`).join(', ');
+  const webWhat = wafN ? `${fmtN(wafN)} malicious HTTP requests to our web server${wsites.size > 1 ? 's' : ''}` + (wcats.size ? ` (${[...wcats].sort((a, b) => b[1] - a[1]).map(([k]) => k).join(', ')})` : '') + ', detected by our web application firewall (ModSecurity)' : '';
   const net = D.geo && D.ipAS[src] >= 0 ? `${D.asnOrg[D.ipAS[src]] || ''} (${D.asn.list[D.ipAS[src]]})`.trim() : '';
   const country = D.geo && D.ipCC[src] >= 0 ? ccName(D.cc.list[D.ipCC[src]]) : '';
   const verb = blocked === SEL.length ? 'logged and blocked' : 'logged';
+  const whatAll = wafN === SEL.length ? webWhat : wafN ? `${what}; plus ${webWhat}` : what;
   // sample lines: the first and last few, plus an even spread in between
   const pick = new Set(), n = SEL.length, want = Math.min(n, 15);
   for (let k = 0; k < Math.min(5, n); k++) { pick.add(k); pick.add(n - 1 - k); }
@@ -2157,7 +2734,9 @@ function abuseReport() {
     '',
     'Hello,',
     '',
-    `We are reporting unwanted traffic from ${ip}${net ? `, which belongs to your network ${net}` : ''}. Between ${utc(first)} and ${utc(last)}, our firewall ${verb} ${fmtN(SEL.length)} connection attempts from this address: ${what}.`,
+    wafN === SEL.length
+      ? `We are reporting unwanted traffic from ${ip}${net ? `, which belongs to your network ${net}` : ''}. Between ${utc(first)} and ${utc(last)}, our web application firewall (ModSecurity) flagged ${fmtN(SEL.length)} malicious HTTP requests from this address${blocked ? `, ${blocked === SEL.length ? 'all' : fmtN(blocked)} of them blocked` : ''}` + (wcats.size ? `, matching ${[...wcats].sort((a, b) => b[1] - a[1]).map(([k]) => k).join(', ')} attack rules` : '') + (wpaths.size ? `. The most requested paths were ${[...wpaths].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k).join(', ')}.` : '.')
+      : `We are reporting unwanted traffic from ${ip}${net ? `, which belongs to your network ${net}` : ''}. Between ${utc(first)} and ${utc(last)}, our firewall ${verb} ${fmtN(SEL.length)} connection attempts from this address: ${whatAll}.`,
     '',
     'Summary',
     row('Source address', ip),
@@ -2168,6 +2747,7 @@ function abuseReport() {
     row('Target ports', topPorts.slice(0, 10).map(([p, k]) => `${p}${svcName(p) ? '/' + svcName(p) : ''} ×${fmtN(k)}`).join(', ') + (topPorts.length > 10 ? `, and ${fmtN(topPorts.length - 10)} more` : '')),
     row('Protocols', [...protos].sort((a, b) => b[1] - a[1]).map(([p, k]) => `${p} ×${fmtN(k)}`).join(', ')),
     row('Target addresses', fmtN(dsts.size)),
+    ...(wafN ? [row('Attack types', topList(wcats, 8) || 'n/a'), row('Targeted sites', topList(wsites, 5) || 'n/a'), row('Requested paths', topList(wpaths, 6) || 'n/a'), ...(wuas.size ? [row('User agents', topList(wuas, 3))] : [])] : []),
     '',
     `Sample log entries (${sample.length} of ${fmtN(SEL.length)}, times in UTC):`,
     ...sample,
@@ -2197,6 +2777,7 @@ function saveReport() {
   dash.querySelector('#ev')?.closest('.card')?.remove();
   dash.querySelectorAll('button, input, .hint, #tip').forEach(e => e.remove());
   dash.querySelectorAll('[title="Filter to this source"]').forEach(e => e.removeAttribute('title'));
+  dash.querySelectorAll('#wiTable tr').forEach(e => e.classList.remove('pick'));
   dash.querySelectorAll('[tabindex], [role=button]').forEach(e => { e.removeAttribute('tabindex'); e.removeAttribute('role'); e.removeAttribute('aria-label'); });
   dash.removeAttribute('hidden'); dash.removeAttribute('id');
 
@@ -2309,6 +2890,27 @@ function makeSample() {
   // 12) a newcomer in the last day: a new network and country probing ports nobody touched before
   { const t0 = end - 16 * 36e5; for (let k = 0; k < 70; k++) add(t0 + k * ri(300, 900) * 1000, { act: 'BLOCK', in: 'eth0', out: '', src: DEMO_NEWCOMER, dst: '2001:db8:1::10', proto: 'TCP', spt: ri(30000, 60000), dpt: pick([2222, 2222, 9443, 60001, 22, 443]), flags: 'SYN', ttl: 54, len: 80, mac: macStr('00:0d:b9:11:22:33', macs.gw, true) }); }
 
+  // 13) a web server behind ModSecurity + OWASP CRS, logging libmodsecurity v3 JSON. Some attackers also show up
+  //     in the firewall logs above (the port sweeper, an SSH brute-forcer), for the "firewall + WAF" cross-check.
+  const WEB = [
+    { cat: 'SQLi', uri: () => `/products.php?id=${ri(1, 99)}'%20OR%201=1--`, rules: [['942100', 'SQL Injection Attack Detected via libinjection', 2, 'attack-sqli']], ua: 'sqlmap/1.8.4#stable (https://sqlmap.org)' },
+    { cat: 'XSS', uri: () => `/search?q=%3Cscript%3Ealert(${ri(1, 9)})%3C/script%3E`, rules: [['941100', 'XSS Attack Detected via libinjection', 2, 'attack-xss']], ua: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36' },
+    { cat: 'LFI', uri: () => `/index.php?page=../../../../etc/passwd`, rules: [['930120', 'OS File Access Attempt', 2, 'attack-lfi'], ['932160', 'Remote Command Execution: Unix Shell Code Found', 2, 'attack-rce']], ua: 'curl/8.4.0' },
+    { cat: 'RCE', uri: () => `/cgi-bin/luci/;stok=/locale?form=country&operation=write&country=$(id)`, rules: [['932100', 'Remote Command Execution: Unix Command Injection', 2, 'attack-rce']], ua: 'Mozilla/5.0' },
+    { cat: 'Scanner', uri: () => pick(['/.env', '/.git/config', '/wp-config.php.bak', '/phpinfo.php', '/admin/', '/actuator/health']), rules: [['913100', 'Found User-Agent associated with security scanner', 2, 'attack-reputation-scanner'], ['930130', 'Restricted File Access Attempt', 2, 'attack-lfi']], ua: 'Mozilla/5.00 (Nikto/2.5.0)' },
+    { cat: 'Protocol', uri: () => '/', rules: [['920350', 'Host header is a numeric IP address', 4, 'attack-protocol']], ua: 'Mozilla/5.0 zgrab/0.x', numericHost: true },
+  ];
+  const webEv = (t, src, kind, extra = {}) => {
+    const k = WEB[kind], score = k.rules.reduce((s, r) => s + (r[2] <= 2 ? 5 : 3), 0), blocked = score >= 5;
+    const rules = k.rules.concat(blocked ? [['949110', `Inbound Anomaly Score Exceeded (Total Score: ${score})`, 0, 'anomaly-evaluation']] : []);
+    add(t, Object.assign({ waf: true, src, site: k.numericHost ? '198.51.100.250' : pick(['shop.example.com', 'shop.example.com', 'blog.example.com']), method: 'GET', uri: k.uri(), ua: k.ua, rules, status: blocked ? 403 : 200 }, extra));
+  };
+  for (let t = startT; t < end; t += ri(600, 3000) * 1000) webEv(t, rnd() < 0.2 ? pick(['203.0.113.66', '192.0.2.201']) : pub(), Math.floor(rnd() * WEB.length));
+  // a content scanner walking 60 paths in two minutes, from the address that also swept the firewall's ports
+  { const t0 = startT + 2.6 * 864e5; for (let k = 0; k < 60; k++) add(t0 + k * 2000, { waf: true, src: '203.0.113.66', site: 'shop.example.com', method: 'GET', uri: pick(['/', '/admin', '/backup', '/old', '/test', '/api', '/db', '/sql', '/config', '/private']) + '/' + k + pick(['.php', '.zip', '.bak', '.sql', '']), ua: 'Mozilla/5.0 (compatible; Nmap Scripting Engine)', rules: [['913100', 'Found User-Agent associated with security scanner', 2, 'attack-reputation-scanner'], ['949110', 'Inbound Anomaly Score Exceeded (Total Score: 5)', 0, 'anomaly-evaluation']], status: 403 }); }
+  // a WordPress login brute force: same path over and over
+  { const t0 = startT + 4.2 * 864e5; for (let k = 0; k < 90; k++) add(t0 + k * ri(20, 60) * 1000, { waf: true, src: '198.51.100.23', site: 'blog.example.com', method: 'POST', uri: '/wp-login.php', ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', rules: [['9500001', 'Custom: repeated login attempts', 3, 'attack-generic']], status: k % 10 < 6 ? 403 : 200 }); }
+
   // 11) a Windows desktop on the LAN with pfirewall.log logging (dropped inbound, some allowed outbound)
   const WIN = '192.168.1.60';
   for (let t = startT; t < end; t += ri(60, 600) * 1000) {
@@ -2327,6 +2929,14 @@ function makeSample() {
     '#Fields: date time action protocol src-ip dst-ip src-port dst-port size tcpflags tcpsyn tcpack tcpwin icmptype icmpcode info path pid\n' + ev.map(e => {
     const d = new Date(e.t + ri(0, 999));
     const w = wall(d);
+    if (e.waf) {
+      const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(Date.UTC(w.y, w.mo, w.d)).getUTCDay()];
+      return JSON.stringify({ transaction: { client_ip: e.src, time_stamp: `${DAY} ${MONS[w.mo]} ${String(w.d).padStart(2, ' ')} ${pad(w.h)}:${pad(w.mi)}:${pad(w.s)} ${w.y}`, server_id: 'sample', client_port: ri(30000, 65000),
+        host_ip: '198.51.100.250', host_port: 443, unique_id: `${Math.floor(e.t / 1000)}.${ri(100000, 999999)}`,
+        request: { method: e.method, http_version: 1.1, uri: e.uri, headers: { Host: e.site, 'User-Agent': e.ua } },
+        response: { http_code: e.status, headers: {} }, producer: { modsecurity: 'ModSecurity v3.0.12 (Linux)', components: ['OWASP_CRS/4.7.0'] },
+        messages: e.rules.map(([id, msg, sev, tag]) => ({ message: msg, details: { ruleId: id, severity: String(sev), tags: [tag] } })) } });
+    }
     if (e.win) {
       const tcp = e.proto === 'TCP' && e.path === 'RECEIVE', icmp = e.proto === 'ICMP';
       return [`${w.y}-${pad(w.mo + 1)}-${pad(w.d)}`, `${pad(w.h)}:${pad(w.mi)}:${pad(w.s)}`, e.act, e.proto, e.src, e.dst,
