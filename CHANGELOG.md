@@ -2,7 +2,7 @@
 
 What changed in each release of fwscope. The newest is at the top. Version numbers follow [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.3.0 (2026-11-08)
 
 ### Added
 - **OpenWrt:** firewall logs from `logread` or a syslog server, fw4 (`drop wan in:`) and fw3 (`DROP(src wan)`). The verdict is the action and the zone the rule.
