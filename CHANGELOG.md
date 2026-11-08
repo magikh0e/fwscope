@@ -2,7 +2,7 @@
 
 What changed in each release of fwscope. The newest is at the top. Version numbers follow [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.4.0 (2026-11-08)
 
 ### Added
 - **fwscope-pull.py:** a Python script (no dependencies; Windows, macOS, Linux) that gathers logs onto the computer you run fwscope on: this machine, Linux servers, OPNsense / pfSense and OpenWrt over SSH, Cloudflare events past the 10,000-per-request limit, and AWS / Azure flow logs through their command-line tools. Each format's tab on the start screen shows its command.
