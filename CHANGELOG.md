@@ -2,7 +2,7 @@
 
 What changed in each release of fwscope. The newest is at the top. Version numbers follow [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.1.0 (2026-11-08)
 
 ### Added
 - **Add files to what's loaded:** once logs are open, the button reads **Add logs**. Opening or dropping more files adds them to the dashboard, and a note says how many new events each added and how many duplicates were skipped. Your filter, view and block ticks stay as they were. **Clear** starts over.
