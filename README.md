@@ -111,3 +111,11 @@ The filter bar also has time presets (relative to the newest event in the logs, 
 - Classic syslog timestamps have no year or timezone. The year is inferred from the file's modified date, and the time is read as your browser's local time. ISO and journal timestamps carry their offset and are converted to your local time.
 - Tested to about 550K events (137 MB) in a few seconds. Data is stored in columns of typed arrays, so filtering stays fast.
 - **Sample data** generates a fake week of logs using the documentation IP ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32), so no real addresses are implicated.
+
+## License
+
+Copyright (C) 2026 magikh0e
+
+fwscope is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; see [LICENSE](LICENSE) for the full text.
+
+Bundled data keeps its own terms: the country outlines are Natural Earth (public domain) and the country names come from [i18n-iso-countries](https://github.com/michaelwittig/node-i18n-iso-countries) (MIT). GeoIP databases are not included; each one is under its provider's license.

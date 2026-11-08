@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 magikh0e
 // fwscope: builds the world map that index.html embeds, and writes it between the
 // MAP-DATA markers in index.html.
 //

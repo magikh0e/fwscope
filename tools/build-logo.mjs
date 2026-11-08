@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 magikh0e
 // fwscope: draws the logo emblem (scope ring, dotted world map, brick wall, hit dots)
 // from the world map already embedded in index.html, then writes:
 //   assets/logo.svg      full-detail emblem on a dark tile (README, sharing)
