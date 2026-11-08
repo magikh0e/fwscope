@@ -4,6 +4,10 @@
 
 A single-file, offline visualizer for UFW / iptables, OPNsense / pfSense and Windows Firewall logs. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box.
 
+![fwscope dashboard showing a week of sample firewall logs: summary tiles, events over time, a world map of sources with the top networks, and new sources, networks, countries and ports in the last 24 hours](assets/screenshot.png)
+
+*The built-in sample data (made-up documentation addresses). Open `index.html?demo` to see it live.*
+
 ## What it reads
 
 - `/var/log/ufw.log`, `kern.log`, `syslog`, including rotated `.gz` files (gzip is detected by magic bytes)
@@ -72,7 +76,7 @@ How it maps onto the dashboard:
 - `DROP` counts as a block and `ALLOW` as allowed.
 - The log has no interface names, so **In** shows `receive` for inbound packets and **Out** shows `send` for outbound ones. Filter with `in:receive` or `out:send`.
 - The log has no hostname either. **Host** is the file name, so rename each copy after its PC (`office-pc.log`) to tell machines apart. Otherwise it shows as `windows`. A `#Host: name` line at the top of the file also works.
-- No rule name or TTL is logged. Times are local with no timezone, so they're read as your browser's local time.
+- No rule name or TTL is logged. Times have no timezone: they're read in the zone set under **Logs without a timezone are in**, which defaults to your browser's own (see Notes).
 - The parser follows the `#Fields:` header, so the extra process-ID column on newer Windows builds is fine.
 
 ## What you get
@@ -82,11 +86,30 @@ How it maps onto the dashboard:
 - **Two "Top" lists**, each switchable: sources, source subnets (/24 and /64), destinations, destination and source ports (with service names), protocols, in/out interfaces, ICMP types, source MACs, logging hosts, exact action tags
 - **New in the last hour / 24 hours / 7 days**: sources, networks, countries and destination ports first seen in that window and never earlier in the loaded logs. The window ends at the newest event loaded. It follows the current filter but always looks back through all loaded history, so `dpt:22` gives you new SSH sources. It warns you when too little history is loaded to tell what's actually new. Busy routers turn up lots of "new" high ports from ordinary traffic; `act:block` narrows it to what was blocked.
 - **Weekday × hour heatmap**
-- **Likely port scans**: sources ranked by how many distinct destination ports they hit
+- **Scans and hammering**: blocked sources that swept many ports or kept hitting one, each with a pattern label:
+  - **fast sweep**: 50+ ports within an hour
+  - **slow scan**: 20+ ports spread over 6 hours or more
+  - **port scan**: 5 or more ports
+  - **host sweep**: one or two ports across 10+ of your addresses
+  - **hammering**: 100+ hits, at least 80% on one port (e.g. SSH brute force)
+
+  For scans, **Over** is how long the sweep itself took, measured across most of its ports, so stray hits days later don't stretch it. The full first-to-last time is on hover. LAN multicast/broadcast chatter and allowed traffic aren't counted.
 - **Event table** with paging. Click any cell to filter on it.
+  - **Sorting:** click a column header to sort by it; click again to reverse. Ties stay in time order, IP addresses sort numerically, and empty values go last. It takes well under a second even for millions of events, and the sort is saved with the view.
+  - **Copy:** the ⧉ button on each row copies that event as one readable line, e.g. `2026-11-06T09:59:54.000Z BLOCK in=WAN1(vtnet1) TCP 77.67.26.158:30178 -> 66.75.74.68:52802 src_cc=GB len=40 ttl=47 flags=SYN rule=… "WAN1: DSHield Block List"`.
 - **Exports**: CSV of the current filter, a source IP list, and `ufw deny` rules for the top public sources (review those before you run them)
+- **Save report** (header): writes the current view to one standalone HTML file. It includes the summary, timeline, map, Top lists, New card, heatmap and scans table, plus what filter, time range and files it covers. It has no script and no individual log lines, so you can send it or keep it as a record without sharing your logs. It does include addresses, ports and any rule or interface names you loaded.
+- **Abuse report** (Events card): with the filter narrowed to one outside source, drafts a plain-text report for that network's abuse desk. It includes a subject line, what happened (e.g. "a fast port scan: 1,027 ports probed within 3 minutes" or "repeated connection attempts to port 22 (SSH), consistent with brute-force login attempts"), times in UTC, targeted ports, and 15 sample log lines. Interface and rule names are left out. Nothing is sent: you review it, copy it or save it. Links to the address's RDAP record (where the abuse contact is) and to AbuseIPDB's report form open only if you click them.
+- **Keyboard**: everything that filters on click can also be reached with Tab: Top-list rows, map countries with events, New card rows, scan rows and event table cells. Enter filters, Shift+Enter excludes, and focusing a row shows its tooltip. Table headers sort with Enter.
 
 Click any row or cell to filter on it. Shift-click excludes it instead.
+
+**Starting views.** Until you pick something, the Top lists and the New window are chosen to fit what you load:
+- OPNsense logs with rules open on **Firewall rules**.
+- Logs from several machines, or a mix of firewalls, open on **Logging hosts**.
+- Under two days of history starts the New card at **last hour**.
+
+Lists that would be empty for the loaded logs are greyed out in the menus. Once you pick a list or window yourself, it stays, unless it can't show anything for the next set of logs.
 
 **Saved views.** Everything you set is saved in the page address, e.g. `index.html#q=dpt:22&t=7d&n=1&d=src,cc,asn`. That covers the filter, time range, action toggles, checkboxes and which lists the Top cards show. Bookmark that address and it opens the same view on whatever logs you load. The browser also remembers your last view for next time, apart from a zoomed time range, which rarely fits the next set of logs. **Reset view** clears it all.
 
@@ -161,7 +184,9 @@ The filter bar also has time presets (relative to the newest event in the logs, 
 
 ## Notes
 
-- Classic syslog timestamps have no year or timezone. The year is inferred from the file's modified date, and the time is read as your browser's local time. ISO and journal timestamps carry their offset and are converted to your local time.
+- **Page address options:** `index.html?demo` opens straight on the sample data, `?theme=dark` or `?theme=light` forces a theme, and `?tz=UTC` (or any zone name) reads zone-less logs in that zone for that visit. None of these are saved. They're handy for demos and screenshots.
+
+- Classic syslog, `dmesg -T` and Windows Firewall timestamps have no timezone (syslog has no year either; it's inferred from the file's modified date). **Logs without a timezone are in**, under the header, sets the zone the logging machine was in: your browser's own by default, UTC, or any named zone like `America/New_York`. Named zones handle daylight saving. It applies to logs you load next. ISO, journal and OPNsense timestamps carry their own offset and aren't affected. Everything is shown in your browser's timezone.
 - Data is stored in columns of typed arrays (about 55 bytes per event), so filtering stays fast even with millions of events.
 - **Sample data** generates a fake week of logs using the documentation IP ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32), so no real addresses are implicated.
 

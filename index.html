@@ -75,6 +75,7 @@ header.top h1 span { color: var(--muted); font-weight: 400; }
 @media (max-width: 860px) { .howto { grid-template-columns: 1fr; } }
 .howto pre { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; font: 12px/1.5 var(--mono); }
 .howto ul { margin: 6px 0; padding-left: 18px; color: var(--ink-2); }
+#drop code, .howto code { overflow-wrap: anywhere; }
 .howto h3 { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 12px 0 4px; }
 
 /* progress */
@@ -82,6 +83,15 @@ header.top h1 span { color: var(--muted); font-weight: 400; }
 #progress button { font-size: 12px; padding: 1px 8px; margin-left: 6px; }
 .loadopts { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; color: var(--muted); font-size: 12.5px; margin: -6px 0 10px; }
 .loadopts .muted { color: var(--muted); }
+.loadopts select { font-size: 12px; padding: 1px 4px; max-width: 220px; }
+#tzNote { color: var(--accent); }
+@media (max-width: 560px) {
+  .loadopts { flex-direction: column; align-items: flex-start; }
+  .loadopts .muted { display: none; }
+  .loadopts label.tog { flex-wrap: wrap; max-width: 100%; }
+  .loadopts select { max-width: 100%; }
+}
+.pat { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 9px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
 #progress .bar { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; margin-top: 6px; }
 #progress .bar div { height: 100%; width: 0; background: var(--accent); transition: width .1s; }
 
@@ -147,6 +157,14 @@ td.clk { cursor: pointer; }
 td.clk:hover { color: var(--accent); text-decoration: underline; }
 tr.clk { cursor: pointer; }
 tr.clk:hover td { background: var(--surface-2); }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover, th.sortable:focus-visible { color: var(--ink); }
+th.sorted { color: var(--ink); }
+th .arrow { font-size: 10px; }
+.cpcol { width: 1px; padding-left: 0; padding-right: 2px; }
+.cp { border: 0; background: transparent; color: var(--muted); padding: 0 4px; font-size: 13px; opacity: .45; }
+tr:hover .cp, .cp:focus-visible { opacity: 1; }
+.cp:hover { color: var(--accent); background: transparent; }
 .act { display: inline-flex; align-items: center; gap: 5px; }
 .pager { display: flex; gap: 8px; align-items: center; margin-top: 10px; color: var(--ink-2); font-size: 13px; flex-wrap: wrap; }
 
@@ -170,6 +188,10 @@ tr.clk:hover td { background: var(--surface-2); }
 .newrow .nl small { font-family: system-ui, sans-serif; color: var(--muted); }
 .newrow .nc { color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .newgrid .none { color: var(--muted); font-size: 12px; }
+[role=button]:focus-visible, .cp:focus-visible, th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 3px; }
+#map [role=button]:focus-visible { outline: none; stroke: var(--ink); stroke-width: 2; }
+.out-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: -4px 0 10px; font-size: 13px; }
+.out-links a { color: var(--accent); }
 .newnote { background: var(--surface-2); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
 
 /* map */
@@ -201,14 +223,18 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
     <button class="primary" id="btnOpen">Open logs</button>
     <button id="btnPaste">Paste</button>
     <button id="btnSample">Sample data</button>
+    <button id="btnReport" hidden title="Save the current view as a standalone HTML report (charts and lists, no raw events)">Save report</button>
     <button id="btnClear" hidden>Clear</button>
     <button id="btnTheme" title="Toggle light/dark">◐</button>
   </header>
 
   <div class="loadopts" title="These apply to files you load next. Skipped events never take up memory, so more days fit.">
     <span>When loading:</span>
-    <label class="tog"><input type="checkbox" id="optChatter"> Skip LAN chatter <span class="muted">(multicast, broadcast, IPv6 neighbor discovery)</span></label>
-    <label class="tog"><input type="checkbox" id="optBlocks"> Blocks only <span class="muted">(skip ALLOW / PASS)</span></label>
+    <label class="tog" title="Skips multicast, broadcast and IPv6 neighbor discovery while loading"><input type="checkbox" id="optChatter"> Skip LAN chatter <span class="muted">(multicast, broadcast, IPv6 neighbor discovery)</span></label>
+    <label class="tog" title="Skips ALLOW / PASS events while loading"><input type="checkbox" id="optBlocks"> Blocks only <span class="muted">(skip ALLOW / PASS)</span></label>
+    <label class="tog" title="Classic syslog, dmesg -T and Windows Firewall logs don't record a timezone. Pick the zone the logging machine was set to. Logs with a timezone (ISO, journal, OPNsense) aren't affected.">Logs without a timezone are in
+      <select id="optTz"></select></label>
+    <span id="tzNote" hidden>Applies to logs you load next: Clear and reload the files to re-read them in that zone.</span>
   </div>
   <div id="progress"><span id="progText">Reading…</span> <button id="btnStop" title="Stop reading and keep what's loaded so far">Stop</button><div class="bar"><div id="progBar"></div></div></div>
 
@@ -355,14 +381,14 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <div class="scale" id="hmScale"></div>
       </div>
       <div class="card">
-        <div class="card-head"><h2>Likely port scans</h2><span class="sub">sources that touched the most distinct destination ports</span></div>
+        <div class="card-head"><h2>Scans and hammering</h2><span class="sub">blocked sources sweeping many ports, or hitting the same port over and over</span></div>
         <div class="tbl-wrap"><table id="scan"></table></div>
       </div>
     </div>
 
     <div class="card">
       <div class="card-head"><h2>Events</h2><span class="sub" id="evSub"></span><span class="grow"></span>
-        <button id="btnCsv">Export CSV</button><button id="btnIps">Source IP list</button><button id="btnRules">ufw deny rules</button>
+        <button id="btnCsv">Export CSV</button><button id="btnIps">Source IP list</button><button id="btnRules">ufw deny rules</button><button id="btnAbuse" title="Draft a report to the network owner about one source. Filter to a single source first, e.g. by clicking it in a list.">Abuse report</button>
       </div>
       <div class="tbl-wrap"><table id="ev"></table></div>
       <div class="pager"><button id="pgNew">◀ Newer</button><button id="pgOld">Older ▶</button><span id="pgText"></span><span class="grow"></span><label class="tog"><input type="checkbox" id="oldestFirst"> Oldest first</label></div>
@@ -383,6 +409,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
 <dialog id="outDlg">
   <h2 style="margin-top:0;font-size:15px" id="outTitle"></h2>
   <p class="sub" id="outNote" style="color:var(--muted);margin-top:0"></p>
+  <div id="outLinks" class="out-links"></div>
   <textarea id="outText" rows="16" readonly></textarea>
   <div class="btns"><button id="outCopy">Copy</button><button id="outSave">Save file</button><button class="primary" id="outClose">Close</button></div>
 </dialog>
@@ -596,7 +623,7 @@ const COLS = { ts: Float64Array, act: Uint8Array, src: Uint32Array, dst: Uint32A
 let D;
 function resetStore() {
   D = { n: 0, cap: 0, c: {}, ip: new Intern(), proto: new Intern(), iface: new Intern(), host: new Intern(), mac: new Intern(), act: new Intern(), rule: new Intern(),
-        actGroup: [], files: [], dupes: 0, skipped: 0, lines: 0, noTime: 0, prior: [], order: null, ipc: null, minTs: NaN, maxTs: NaN };
+        actGroup: [], files: [], kinds: {}, dupes: 0, skipped: 0, lines: 0, noTime: 0, prior: [], order: null, ipc: null, minTs: NaN, maxTs: NaN };
   D.iface.id(''); D.host.id(''); D.mac.id(''); D.ip.id(''); D.rule.id('');
   grow(1 << 14);
 }
@@ -611,8 +638,34 @@ const nextCap = cap => cap < 4194304 ? cap * 2 : Math.ceil(cap * 1.5);
 const memMB = () => Math.round((D.cap * ROW_BYTES + D.prior.reduce((s, p) => s + p.keys.byteLength, 0)) / 1e6);
 
 /* load-time skipping: rows dropped here never use memory (the view toggles only hide them) */
-const LOAD = { chatter: false, blocksOnly: false };
+const LOAD = { chatter: false, blocksOnly: false, tz: '' };
 try { Object.assign(LOAD, JSON.parse(localStorage.getItem('fwscope-load') || '{}')); } catch {}
+
+/* Timestamps without a zone (classic syslog, dmesg -T, Windows pfirewall.log) are wall-clock times in
+   whatever zone the logging machine was set to. LOAD.tz names that zone ('' = this browser's own).
+   Named zones handle daylight saving: the zone's UTC offset is looked up per hour and cached. */
+const BROWSER_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local';
+let tzFmt = null, tzFmtFor = '', tzCache = new Map();
+function zoneOffsetMs(zone, utc) {
+  const hour = Math.floor(utc / 36e5);
+  let off = tzCache.get(hour);
+  if (off !== undefined) return off;
+  if (tzFmtFor !== zone) { tzFmt = new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }); tzFmtFor = zone; tzCache = new Map(); }
+  const p = {}; for (const x of tzFmt.formatToParts(new Date(hour * 36e5))) p[x.type] = +x.value;
+  off = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - hour * 36e5;
+  tzCache.set(hour, off);
+  return off;
+}
+function wallTime(y, mo, d, h, mi, s) {
+  const zone = LOAD.tz;
+  if (!zone) return new Date(y, mo, d, h, mi, s).getTime();
+  const guess = Date.UTC(y, mo, d, h, mi, s);
+  let t = guess - zoneOffsetMs(zone, guess);
+  const again = guess - zoneOffsetMs(zone, t); // second pass settles times near a daylight-saving switch
+  if (again !== t) t = again;
+  return t;
+}
+const tzLabel = () => LOAD.tz ? LOAD.tz : `this browser's timezone (${BROWSER_TZ})`;
 function isChatter(r) {
   const d = r.dst || '', s = r.src || '';
   return /^ff/i.test(d) || /^2(2[4-9]|3\d)\./.test(d) || d.endsWith('.255') || r.proto === 'IGMP' || /^fe[89ab]/i.test(s) ||
@@ -644,12 +697,12 @@ function parseTime(line, ctx) {
   }
   m = RE_SYS.exec(line);
   if (m && MON[m[1]] !== undefined) {
-    let d = new Date(ctx.year, MON[m[1]], +m[2], +m[3], +m[4], +m[5]);
-    if (d.getTime() > ctx.ref + 2 * 864e5) d = new Date(ctx.year - 1, MON[m[1]], +m[2], +m[3], +m[4], +m[5]);
-    return { ts: d.getTime(), len: m[0].length };
+    let t = wallTime(ctx.year, MON[m[1]], +m[2], +m[3], +m[4], +m[5]);
+    if (t > ctx.ref + 2 * 864e5) t = wallTime(ctx.year - 1, MON[m[1]], +m[2], +m[3], +m[4], +m[5]);
+    return { ts: t, len: m[0].length };
   }
   m = RE_DMESG.exec(line);
-  if (m && MON[m[1]] !== undefined) return { ts: new Date(+m[6], MON[m[1]], +m[2], +m[3], +m[4], +m[5]).getTime(), len: m[0].length };
+  if (m && MON[m[1]] !== undefined) return { ts: wallTime(+m[6], MON[m[1]], +m[2], +m[3], +m[4], +m[5]), len: m[0].length };
   return { ts: NaN, len: 0 };
 }
 
@@ -698,11 +751,12 @@ function wfHostName(ctx) {
   return !stem || /^pfirewall$/i.test(stem) ? 'windows' : stem;
 }
 function wfLine(line, ctx) {
+  D.kinds.win = 1;
   const v = line.split(' '), F = ctx.wfFields || WF_DEFAULT, o = {};
   for (let i = 0; i < F.length && i < v.length; i++) if (v[i] !== '-') o[F[i]] = v[i];
   if (!o.date || !o.time) return;
   const [y, mo, d] = o.date.split('-').map(Number), [h, mi, s] = o.time.split(':').map(Number);
-  const ts = new Date(y, mo - 1, d, h, mi, s).getTime();
+  const ts = wallTime(y, mo - 1, d, h, mi, s);
   if (isDup(ts, line, ctx)) return;
   const p = (o.protocol || '?').toUpperCase();
   const proto = /^\d+$/.test(p) ? PROTO_NUM[p] || 'proto ' + p : p === 'ICMPV6' ? 'ICMPv6' : p;
@@ -788,6 +842,7 @@ function opnRule(rulenr, label) {
   return rulenr ? '#' + rulenr : '';
 }
 function filterlogCsv(csv, ts, host, ctx) {
+  D.kinds.opn = 1;
   const f = csv.split(',');
   if (f.length < 15 || isDup(ts, csv, ctx)) return;
   const action = f[6], dir = f[7], v = f[8], iface = f[4];
@@ -802,6 +857,7 @@ function filterlogCsv(csv, ts, host, ctx) {
   addRow(r, ctx);
 }
 function opnApiObj(o, ctx) {
+  D.kinds.opn = 1;
   const ts = o.__timestamp__ ? Date.parse(o.__timestamp__) : o.timestamp ? Date.parse(o.timestamp) : NaN;
   if (isDup(ts, [o.rulenr, o.interface, o.action, o.dir, o.src, o.dst, o.srcport, o.dstport, o.protoname, o.length, o.id, o.seq].join(','), ctx)) return;
   const dir = o.dir === 'out' ? 'out' : 'in', iface = o.interface_name || o.interface || '';
@@ -815,6 +871,7 @@ function opnApiObj(o, ctx) {
 }
 
 function ufwMsg(msg, ts, host, ctx) {
+  D.kinds.ufw = 1;
   const i = msg.indexOf('[UFW ');
   const j = msg.indexOf(']', i);
   if (j < 0) return;
@@ -851,6 +908,21 @@ function progress(text, frac) {
   $('#progText').textContent = text + (D ? ` · ${fmtN(D.n)} events` + (D.skipped ? `, ${fmtN(D.skipped)} skipped` : '') + ` · ~${fmtN(memMB())} MB` : '');
 }
 $('#btnStop').onclick = () => { if (D) D.stop = true; };
+(function tzSelect() {
+  const s = $('#optTz');
+  let zones = []; try { zones = Intl.supportedValuesOf('timeZone'); } catch {}
+  if (!zones.includes('UTC')) zones.unshift('UTC');
+  if (LOAD.tz && !zones.includes(LOAD.tz)) LOAD.tz = '';
+  const o0 = el('option', null, `this browser's (${BROWSER_TZ})`); o0.value = ''; s.append(o0);
+  const utc = el('option', null, 'UTC'); utc.value = 'UTC'; s.append(utc);
+  for (const z of zones) if (z !== 'UTC') { const o = el('option', null, z.replace(/_/g, ' ')); o.value = z; s.append(o); }
+  s.value = LOAD.tz;
+  s.onchange = () => {
+    LOAD.tz = s.value; tzCache = new Map(); tzFmtFor = '';
+    try { localStorage.setItem('fwscope-load', JSON.stringify(LOAD)); } catch {}
+    if (D && D.n && Object.keys(D.kinds).some(k => k === 'win' || k === 'ufw')) $('#tzNote').hidden = false;
+  };
+})();
 for (const [id, k] of [['#optChatter', 'chatter'], ['#optBlocks', 'blocksOnly']]) {
   $(id).checked = !!LOAD[k];
   $(id).onchange = e => { LOAD[k] = e.target.checked; try { localStorage.setItem('fwscope-load', JSON.stringify(LOAD)); } catch {} };
@@ -970,9 +1042,10 @@ function finish() {
   const allowTags = new Set(D.act.list.filter((s, id) => D.actGroup[id] === 2).map(s => s.startsWith('PASS') ? 'PASS' : 'ALLOW'));
   GROUPS[2].name = allowTags.size === 1 ? [...allowTags][0] : allowTags.size ? 'ALLOW/PASS' : 'ALLOW';
   D.hasRules = D.rule.list.length > 1;
-  $('#empty').hidden = true; $('#dash').hidden = false; $('#btnClear').hidden = false;
+  $('#empty').hidden = true; $('#dash').hidden = false; $('#btnClear').hidden = false; $('#btnReport').hidden = false;
   F.page = 0;
   buildActChips();
+  autoView();
   setQuery(F.q, true); // compiles a restored filter now that there's data to match against
 }
 
@@ -1083,14 +1156,14 @@ function compileQuery(q) {
 }
 
 /* ============================================================ filter state */
-const F = { preset: 'all', range: null, acts: [true, true, true, true], q: '', preds: [], hideNoise: false, publicOnly: false, page: 0, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h' };
+const F = { preset: 'all', range: null, acts: [true, true, true, true], q: '', preds: [], hideNoise: false, publicOnly: false, page: 0, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false };
 let SEL = new Uint32Array(0);
 
 /* ============================================================ view state: kept in the page address and the browser
    #q=dpt:22&t=7d&a=1101&n=1&p=1&d=src,dpt,asn&o=1   (t is a preset or "from-to" in epoch ms)
    The address makes a view bookmarkable; local storage brings it back on the next visit.
    A zoomed time range is only kept in the address: it rarely fits the next set of logs. */
-const VIEW_DEFAULT = { preset: 'all', range: null, acts: [true, true, true, true], q: '', hideNoise: false, publicOnly: false, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h' };
+const VIEW_DEFAULT = { preset: 'all', range: null, acts: [true, true, true, true], q: '', hideNoise: false, publicOnly: false, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false };
 function viewString(withRange) {
   const p = new URLSearchParams();
   if (F.q.trim()) p.set('q', F.q.trim());
@@ -1100,8 +1173,9 @@ function viewString(withRange) {
   if (F.publicOnly) p.set('p', '1');
   if (F.oldestFirst) p.set('o', '1');
   const dims = [F.dimA, F.dimB, F.dimC].join(',');
-  if (dims !== 'src,dpt,asn') p.set('d', dims);
-  if (F.newWin !== '24h') p.set('w', F.newWin);
+  if (F.dimsChosen) p.set('d', dims); // only lists you picked; automatic picks are redone for each set of logs
+  if (F.winChosen) p.set('w', F.newWin);
+  if (F.sort) p.set('s', F.sort);
   return p.toString();
 }
 function readView(str) {
@@ -1111,7 +1185,9 @@ function readView(str) {
   const r = /^(\d{10,})-(\d{10,})$/.exec(t);
   if (r) v.range = [+r[1], +r[2]]; else if (['1h', '24h', '7d', '30d'].includes(t)) v.preset = t;
   if (/^[01]{4}$/.test(p.get('a') || '')) v.acts = [...p.get('a')].map(x => x === '1');
-  if (NEW_WIN_KEYS.includes(p.get('w'))) v.newWin = p.get('w');
+  if (NEW_WIN_KEYS.includes(p.get('w'))) { v.newWin = p.get('w'); v.winChosen = true; }
+  v.dimsChosen = p.has('d');
+  if (/^-?(act|host|in|out|proto|src|cc|spt|dst|dpt|len|ttl|rule)$/.test(p.get('s') || '')) v.sort = p.get('s');
   v.hideNoise = p.get('n') === '1'; v.publicOnly = p.get('p') === '1'; v.oldestFirst = p.get('o') === '1';
   const d = (p.get('d') || '').split(',');
   ['dimA', 'dimB', 'dimC'].forEach((k, i) => { if (d[i] && DIM_KEYS.includes(d[i])) v[k] = d[i]; });
@@ -1253,6 +1329,17 @@ function showTip(e, title, rows) {
   tip.style.left = x + 'px'; tip.style.top = y + 'px';
 }
 const hideTip = () => { tip.style.display = 'none'; };
+// Keyboard access for anything that filters on click: Tab to it, Enter or Space filters, Shift+Enter
+// excludes, and focusing shows the same tooltip hover would (anchored to the element).
+function keyable(node, label, activate, tipFn) {
+  node.tabIndex = 0; node.setAttribute('role', 'button');
+  if (label) node.setAttribute('aria-label', label);
+  node.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate({ shiftKey: e.shiftKey }); } });
+  if (tipFn) {
+    node.addEventListener('focus', () => { const r = node.getBoundingClientRect(); tipFn({ clientX: r.right - 8, clientY: r.top + r.height / 2 }); });
+    node.addEventListener('blur', hideTip);
+  }
+}
 const groupRows = (counts, total) => {
   const rows = [];
   for (let g = 3; g >= 0; g--) if (counts[g]) rows.push({ value: fmtN(counts[g]), label: GROUPS[g].name, color: `var(${GROUPS[g].css})` });
@@ -1268,7 +1355,7 @@ function renderAll() {
   $('#foot').textContent = `${fmtN(D.n)} events from ${D.files.length} source${D.files.length > 1 ? 's' : ''}: ${f}.` +
     (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') +
     (D.skipped ? ` ${fmtN(D.skipped)} events skipped while loading (load options).` : '') + ` About ${fmtN(memMB())} MB in memory.` + (D.noTime ? ` ${fmtN(D.noTime)} events have no timestamp (plain dmesg) and are left out of time charts.` : '') +
-    ` Times shown in your browser's timezone.`;
+    ` Times shown in your browser's timezone (${BROWSER_TZ})` + (D.kinds.ufw || D.kinds.win ? `; logs without a timezone were read as ${tzLabel()}.` : '.');
 }
 function renderTiles() {
   const c = D.c, n = SEL.length;
@@ -1535,7 +1622,7 @@ for (const id of ['A', 'B', 'C']) {
   const sel = card.querySelector('.dimSel');
   for (const [k, d] of Object.entries(DIMS)) { const o = el('option', null, d.label); o.value = k; sel.append(o); }
   sel.value = F['dim' + id];
-  sel.onchange = () => { F['dim' + id] = sel.value; renderRank(id); saveView(); };
+  sel.onchange = () => { F['dim' + id] = sel.value; F.dimsChosen = true; renderRank(id); saveView(); };
 }
 const TOPN = 15;
 function renderRank(id) {
@@ -1573,14 +1660,43 @@ function renderRank(id) {
     const cnt = el('div', 'cnt', fmtN(a[4]));
     row.append(lbl, track, cnt);
     const tok = dim.tok(k);
-    row.addEventListener('pointermove', e => showTip(e, dim.name(k) + (sub ? ` (${sub})` : ''), groupRows(a, a[4]).concat([{ value: (100 * a[4] / total).toFixed(1) + '%', label: 'of shown events' }])));
+    const rankTip = e => showTip(e, dim.name(k) + (sub ? ` (${sub})` : ''), groupRows(a, a[4]).concat([{ value: (100 * a[4] / total).toFixed(1) + '%', label: 'of shown events' }]));
+    row.addEventListener('pointermove', rankTip);
     row.addEventListener('pointerleave', hideTip);
-    if (tok) row.addEventListener('click', e => addToken(tok, e.shiftKey));
+    if (tok) { row.addEventListener('click', e => addToken(tok, e.shiftKey)); keyable(lbl, `${dim.name(k)}: ${fmtN(a[4])} events. Enter to filter, Shift+Enter to exclude`, e => addToken(tok, e.shiftKey), rankTip); }
     box.append(row);
   }
   if (rows.length > TOPN) {
     const rest = rows.slice(TOPN).reduce((s, r) => s + r[1][4], 0);
     box.append(el('div', 'more', `+ ${fmtN(rows.length - TOPN)} more, ${fmtN(rest)} events`));
+  }
+}
+
+/* ============================================================ starting view, picked from what's loaded */
+// A list you picked yourself (or that came from a bookmarked address) is kept, unless it can't show
+// anything for these logs (rules without OPNsense, countries without GeoIP ...).
+function dimApplies(k) {
+  if (k === 'rule') return D.hasRules;
+  if (k === 'cc') return D.geo && D.cc.list.length > 0;
+  if (k === 'asn') return D.geo && D.asn.list.length > 0;
+  if (k === 'host') return D.host.list.filter(Boolean).length > 1;
+  if (k === 'mac') return D.mac.list.length > 1;
+  return true;
+}
+function autoView() {
+  const kinds = Object.keys(D.kinds).length, hosts = D.host.list.filter(Boolean).length;
+  // A: who, B: what. Mixed logs or several machines: split by machine first.
+  const auto = kinds > 1 || hosts > 1 ? { dimA: 'host', dimB: 'dpt' }
+    : D.kinds.opn && D.hasRules ? { dimA: 'src', dimB: 'rule' }
+    : { dimA: 'src', dimB: 'dpt' };
+  auto.dimC = dimApplies('asn') ? 'asn' : dimApplies('cc') ? 'cc' : 'asn';
+  for (const k of ['dimA', 'dimB', 'dimC']) if (!F.dimsChosen || !dimApplies(F[k])) F[k] = auto[k];
+  // with under two days of logs, "new in 24 hours" has little to compare against
+  if (!F.winChosen) F.newWin = D.maxTs - D.minTs < 2 * 864e5 ? '1h' : '24h';
+  for (const id of ['A', 'B', 'C']) {
+    const s = document.querySelector(`[data-rank="${id}"] .dimSel`);
+    for (const o of s.options) { o.disabled = !dimApplies(o.value); o.title = o.disabled ? 'Nothing to show for the loaded logs' : ''; }
+    s.value = F['dim' + id];
   }
 }
 
@@ -1610,12 +1726,15 @@ function renderMap() {
   const hook = (node, cc) => {
     const x = D.cc.map.get(cc), v = x === undefined ? 0 : cnt[x * 5 + 4];
     node.style.fill = v ? `var(${MAP_STEPS[step(v)]})` : 'var(--h0)';
-    node.addEventListener('pointermove', e => {
+    const mapTip = e => {
       const a = x === undefined ? [0, 0, 0, 0, 0] : Array.from(cnt.subarray(x * 5, x * 5 + 5));
       showTip(e, `${ccName(cc)} (${cc})`, v ? groupRows(a, a[4]).concat([{ value: fmtN(srcs[x]), label: 'unique sources' }, { value: (100 * v / SEL.length).toFixed(1) + '%', label: 'of shown events' }]) : [{ value: '0', label: 'events from here in the current filter' }]);
-    });
+    };
+    node.addEventListener('pointermove', mapTip);
     node.addEventListener('pointerleave', hideTip);
     node.addEventListener('click', e => addToken('cc:' + cc, e.shiftKey));
+    // only countries with events are tab stops, so the keyboard doesn't wade through 170 empty ones
+    if (v) keyable(node, `${ccName(cc)}: ${fmtN(v)} events. Enter to filter, Shift+Enter to exclude`, e => addToken('cc:' + cc, e.shiftKey), mapTip);
   };
   for (const [cc, d] of Object.entries(MAP.shapes)) { const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); hook(p, cc); svg.append(p); }
   for (const [cc, [cx, cy]] of Object.entries(MAP.dots)) {
@@ -1677,9 +1796,11 @@ function renderNew() {
       const row = el('div', 'newrow'), lbl = el('span', 'nl', col.name(k)), sub = col.sub(k);
       if (sub) { lbl.append(' '); lbl.append(el('small', null, sub)); }
       row.append(lbl, el('span', 'nc', fmtN(col.T.n[k])));
-      row.addEventListener('pointermove', e => showTip(e, col.name(k), [{ value: fmtN(col.T.n[k]), label: 'events in window' }, { value: fmtTime(col.T.first[k]), label: 'first seen' }]));
+      const newTip = e => showTip(e, col.name(k), [{ value: fmtN(col.T.n[k]), label: 'events in window' }, { value: fmtTime(col.T.first[k]), label: 'first seen' }]);
+      row.addEventListener('pointermove', newTip);
       row.addEventListener('pointerleave', hideTip);
       row.addEventListener('click', e => addToken(col.tok(k), e.shiftKey));
+      keyable(row, `New ${col.title.toLowerCase()}: ${col.name(k)}, ${fmtN(col.T.n[k])} events. Enter to filter`, e => addToken(col.tok(k), e.shiftKey), newTip);
       box.append(row);
     }
     if (ks.length > NEW_SHOW) box.append(el('div', 'none', `+ ${fmtN(ks.length - NEW_SHOW)} more`));
@@ -1693,7 +1814,7 @@ function renderNew() {
     ? 'All loaded events fall inside this window, so there is nothing to compare against. Load older logs or pick a shorter window.'
     : `Only ${fmtDur(before)} of history before this window is loaded, so some of these may not really be new. Loading older logs makes this more reliable.`;
 }
-$('#newWin').addEventListener('click', e => { const w = e.target.dataset.w; if (!w || w === F.newWin) return; F.newWin = w; renderNew(); saveView(); });
+$('#newWin').addEventListener('click', e => { const w = e.target.dataset.w; if (!w || w === F.newWin) return; F.newWin = w; F.winChosen = true; renderNew(); saveView(); });
 
 /* ============================================================ render: heatmap */
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -1728,77 +1849,205 @@ function renderHeat() {
 }
 
 /* ============================================================ render: scanners */
+// Pattern labels for noisy sources, from how many ports and addresses they touched and over how long
+const PATTERNS = {
+  'fast sweep': '50+ ports within an hour: an automated scanner going through a port range',
+  'slow scan': '20+ ports spread over 6 hours or more: paced to stay under rate limits and alerts',
+  'port scan': '5 or more different ports',
+  'host sweep': 'one or two ports across 10+ of your addresses: looking for any machine running that service',
+  'hammering': '100+ hits, at least 80% on one port: brute force or a stuck client',
+};
+// How long the source took to touch most of its ports: the span between the 5th and 95th percentile of
+// each port's first hit. Stray hits days before or after a sweep don't stretch a 3-minute scan into days.
+function coreSpan(s) {
+  const t = [...s.ports.values()].map(v => v.t).filter(x => x === x).sort((a, b) => a - b);
+  if (t.length < 2) return 0;
+  return t[Math.floor(0.95 * (t.length - 1))] - t[Math.floor(0.05 * (t.length - 1))];
+}
+function scanPattern(s) {
+  const ports = s.ports.size, dur = s.span = coreSpan(s);
+  let top = 0; for (const v of s.ports.values()) if (v.n > top) top = v.n;
+  // one port taking most of 100+ hits is hammering, even with stray hits on other ports
+  if (s.n >= 100 && top >= 0.8 * s.n) return 'hammering';
+  if (ports >= 50 && dur <= 36e5) return 'fast sweep';
+  if (ports >= 20 && dur >= 6 * 36e5) return 'slow scan';
+  if (ports >= 5) return 'port scan';
+  if (s.dsts.size >= 10) return 'host sweep';
+  if (s.n >= 100) return 'hammering';
+  return '';
+}
 function renderScans() {
-  const c = D.c;
+  const c = D.c, G = D.actGroup, ipc = D.ipc;
   const m = new Map();
+  // only blocked / rate-limited traffic, and not LAN multicast or broadcast chatter
   for (let k = 0; k < SEL.length; k++) {
-    const i = SEL[k], p = c.dpt[i]; if (p < 0) continue;
-    let s = m.get(c.src[i]); if (!s) { s = { ports: new Set(), n: 0, first: Infinity, last: -Infinity }; m.set(c.src[i], s); }
-    s.ports.add(p); s.n++;
+    const i = SEL[k], p = c.dpt[i]; if (p < 0 || G[c.act[i]] > 1 || (ipc[c.dst[i]] & 6)) continue;
+    let s = m.get(c.src[i]); if (!s) { s = { ports: new Map(), dsts: new Set(), n: 0, first: Infinity, last: -Infinity }; m.set(c.src[i], s); }
+    const t0 = c.ts[i]; const v = s.ports.get(p); if (v) v.n++; else s.ports.set(p, { n: 1, t: t0 }); s.n++;
+    if (s.dsts.size < 64) s.dsts.add(c.dst[i]);
     const t = c.ts[i]; if (t === t) { if (t < s.first) s.first = t; if (t > s.last) s.last = t; }
   }
-  const rows = [...m].filter(([, s]) => s.ports.size >= 5).sort((a, b) => b[1].ports.size - a[1].ports.size || b[1].n - a[1].n).slice(0, 12);
+  const all = [...m].map(([src, s]) => [src, s, scanPattern(s)]).filter(r => r[2]);
+  const isFocused = r => r[2] === 'hammering' || r[2] === 'host sweep';
+  const scans = all.filter(r => !isFocused(r)).sort((a, b) => b[1].ports.size - a[1].ports.size || b[1].n - a[1].n).slice(0, 8);
+  const focused = all.filter(isFocused).sort((a, b) => b[1].n - a[1].n).slice(0, 4);
+  const rows = scans.concat(focused);
   const tb = $('#scan'); tb.textContent = '';
-  if (!rows.length) { const tr = el('tr'); tr.append(el('td', null, 'No source hit 5 or more distinct ports in this filter.')); tb.append(tr); return; }
-  const hr = el('tr'); for (const h of ['Source', ...(D.geo ? ['Network'] : []), 'Ports', 'Events', 'Over', 'Sample']) hr.append(el('th', null, h)); tb.append(hr);
-  for (const [src, s] of rows) {
+  if (!rows.length) { const tr = el('tr'); tr.append(el('td', null, 'No scanning or hammering sources among the blocked events in this filter.')); tb.append(tr); return; }
+  const hr = el('tr'); for (const h of ['Source', ...(D.geo ? ['Network'] : []), 'Pattern', 'Ports', 'Events', 'Over', 'Sample']) hr.append(el('th', null, h)); tb.append(hr);
+  for (const [src, s, pat] of rows) {
     const tr = el('tr', 'clk');
-    const ports = [...s.ports].sort((a, b) => a - b);
-    const sample = ports.slice(0, 6).join(', ') + (ports.length > 6 ? ', …' : '');
+    const ports = [...s.ports.keys()].sort((a, b) => a - b);
+    let sample;
+    if (pat === 'hammering' || pat === 'host sweep') {
+      const [top, { n }] = [...s.ports].sort((a, b) => b[1].n - a[1].n)[0];
+      sample = pat === 'host sweep' ? `${top}${svcName(top) ? ' ' + svcName(top) : ''} → ${s.dsts.size >= 64 ? '64+' : s.dsts.size} addresses` : `${top}${svcName(top) ? ' ' + svcName(top) : ''} ×${fmtN(n)}`;
+    } else sample = ports.slice(0, 6).join(', ') + (ports.length > 6 ? ', …' : '');
     tr.append(el('td', 'mono', D.ip.list[src]));
     if (D.geo) { const x = D.ipCC[src], a = D.ipAS[src]; const net = [x >= 0 ? D.cc.list[x] : '', a >= 0 ? asnLabel(a) : ''].filter(Boolean).join(' · '); const d = el('td', null, net); d.style.cssText = 'max-width:180px;overflow:hidden;text-overflow:ellipsis'; d.title = net; tr.append(d); }
-    tr.append(el('td', null, fmtN(s.ports.size)), el('td', null, fmtN(s.n)), el('td', null, s.last >= s.first ? fmtDur(s.last - s.first) : '—'), el('td', 'mono', sample));
+    const pd = el('td'); const pb = el('span', 'pat', pat); pb.title = PATTERNS[pat]; pd.append(pb); tr.append(pd);
+    // for scans, "over" is how long the sweep itself took; the full first-to-last span is on hover
+    const full = s.last >= s.first ? fmtDur(s.last - s.first) : '—';
+    const sweep = !isFocused([src, s, pat]) && s.ports.size >= 5;
+    const over = el('td', null, sweep ? fmtDur(s.span) : full);
+    over.title = sweep ? `Most of its ports were hit within ${fmtDur(s.span)}; first to last hit: ${full}` : `First to last hit: ${full}`;
+    tr.append(el('td', null, fmtN(s.ports.size)), el('td', null, fmtN(s.n)), over, el('td', 'mono', sample));
     tr.title = 'Filter to this source';
     tr.onclick = e => addToken('src:' + D.ip.list[src], e.shiftKey);
+    keyable(tr, `${D.ip.list[src]}: ${pat}, ${fmtN(s.ports.size)} ports, ${fmtN(s.n)} events. Enter to filter`, e => addToken('src:' + D.ip.list[src], e.shiftKey));
     tb.append(tr);
   }
 }
 
 /* ============================================================ render: event table */
 const PAGE = 100;
+// Sorting: every sortable column maps a row to a small integer rank (-1 = no value, always last), so the
+// rows can be bucket-sorted in one stable pass, fast even for millions. Ties keep time order.
+const byLabel = (list, label, plain) => { const ids = list.map((_, i) => i).sort(plain ? (a, b) => { const x = label(a), y = label(b); return x < y ? -1 : x > y ? 1 : 0; } : (a, b) => label(a).localeCompare(label(b), undefined, { numeric: true })); const r = new Int32Array(list.length); ids.forEach((id, k) => r[id] = k); return r; };
+function ipRank() {
+  if (D.ipRankFor === D.ip.list.length) return D.ipRank;
+  const key = D.ip.list.map(s => !s ? '' : (s.includes(':') ? '1' : '0') + (ipBits(s) || s));
+  D.ipRank = byLabel(D.ip.list, i => key[i], true); D.ipRankFor = D.ip.list.length; // bit strings: plain compare is numeric order
+  for (let i = 0; i < D.ip.list.length; i++) if (!D.ip.list[i]) D.ipRank[i] = -1;
+  return D.ipRank;
+}
+const EV_COLS = [
+  { id: 'time', label: 'Time' },
+  { id: 'act', label: 'Action', rank: () => { const r = byLabel(D.act.list, i => D.act.list[i]); return i => r[D.c.act[i]]; } },
+  { id: 'host', label: 'Host', when: () => D.host.list.length > 2, rank: () => { const r = byLabel(D.host.list, i => D.host.list[i] || '￿'); return i => D.c.host[i] ? r[D.c.host[i]] : -1; } },
+  { id: 'in', label: 'In', rank: () => { const r = byLabel(D.iface.list, i => ifLabel(D.iface.list[i]) || D.iface.list[i]); return i => D.c.iin[i] ? r[D.c.iin[i]] : -1; } },
+  { id: 'out', label: 'Out', rank: () => { const r = byLabel(D.iface.list, i => ifLabel(D.iface.list[i]) || D.iface.list[i]); return i => D.c.iout[i] ? r[D.c.iout[i]] : -1; } },
+  { id: 'proto', label: 'Proto', rank: () => { const r = byLabel(D.proto.list, i => D.proto.list[i]); return i => r[D.c.proto[i]]; } },
+  { id: 'src', label: 'Source', rank: () => { const r = ipRank(); return i => r[D.c.src[i]]; } },
+  { id: 'cc', label: 'CC', when: () => D.geo, rank: () => { const r = byLabel(D.cc.list, i => D.cc.list[i]); return i => { const x = D.ipCC[D.c.src[i]]; return x >= 0 ? r[x] : -1; }; } },
+  { id: 'spt', label: 'SPT', rank: () => i => D.c.spt[i] },
+  { id: 'dst', label: 'Destination', rank: () => { const r = ipRank(); return i => r[D.c.dst[i]]; } },
+  { id: 'dpt', label: 'DPT', rank: () => i => D.c.dpt[i] },
+  { id: 'len', label: 'Len', rank: () => i => D.c.len[i] },
+  { id: 'ttl', label: 'TTL', rank: () => i => D.c.ttl[i] },
+  { id: 'flags', label: 'Flags / ICMP' },
+  { id: 'rule', label: 'Rule', when: () => D.hasRules, rank: () => { const r = byLabel(D.rule.list, i => D.rule.list[i] ? ruleName(D.rule.list[i]) : '￿'); return i => D.c.rule[i] ? r[D.c.rule[i]] : -1; } },
+];
+let EVCACHE = null;
+// the rows of the current selection in display order, for a column sort
+function eventRows(col, desc) {
+  const n = SEL.length;
+  if (EVCACHE && EVCACHE.sel === SEL && EVCACHE.sort === F.sort && EVCACHE.oldest === F.oldestFirst && EVCACHE.names === NAMES.sources.length) return EVCACHE.rows;
+  const key = col.rank(), keys = new Int32Array(n);
+  let max = -1;
+  for (let k = 0; k < n; k++) { const v = key(SEL[F.oldestFirst ? k : n - 1 - k]); keys[k] = v; if (v > max) max = v; }
+  const B = max + 2, count = new Uint32Array(B + 1);
+  // desc puts high values first; "no value" (-1) always goes last
+  const bucket = v => v < 0 ? B - 1 : desc ? max - v : v;
+  for (let k = 0; k < n; k++) count[bucket(keys[k]) + 1]++;
+  for (let b = 1; b <= B; b++) count[b] += count[b - 1];
+  const rows = new Uint32Array(n);
+  for (let k = 0; k < n; k++) rows[count[bucket(keys[k])]++] = SEL[F.oldestFirst ? k : n - 1 - k];
+  EVCACHE = { sel: SEL, sort: F.sort, oldest: F.oldestFirst, names: NAMES.sources.length, rows };
+  return rows;
+}
+// one event as a single readable line, for pasting into notes or tickets
+function eventLine(i) {
+  const c = D.c, t = c.ts[i], proto = D.proto.list[c.proto[i]];
+  const iin = D.iface.list[c.iin[i]], iout = D.iface.list[c.iout[i]];
+  const ep = (ip, p) => ip ? (p >= 0 ? (ip.includes(':') ? `[${ip}]:${p}` : `${ip}:${p}`) : ip) : '?';
+  const parts = [t === t ? new Date(t).toISOString() : '-', D.act.list[c.act[i]]];
+  if (D.host.list[c.host[i]]) parts.push('host=' + D.host.list[c.host[i]]);
+  if (iin) parts.push('in=' + (ifLabel(iin) ? `${ifLabel(iin)}(${iin})` : iin));
+  if (iout) parts.push('out=' + (ifLabel(iout) ? `${ifLabel(iout)}(${iout})` : iout));
+  parts.push(proto, `${ep(D.ip.list[c.src[i]], c.spt[i])} -> ${ep(D.ip.list[c.dst[i]], c.dpt[i])}`);
+  if (D.geo) { const x = D.ipCC[c.src[i]], a = D.ipAS[c.src[i]]; if (x >= 0) parts.push('src_cc=' + D.cc.list[x]); if (a >= 0) parts.push(`src_asn=${D.asn.list[a]}${D.asnOrg[a] ? ' "' + D.asnOrg[a] + '"' : ''}`); }
+  if (c.len[i] >= 0) parts.push('len=' + c.len[i]);
+  if (c.ttl[i] >= 0) parts.push('ttl=' + c.ttl[i]);
+  if (c.flags[i]) parts.push('flags=' + flagStr(c.flags[i]).replace(/ /g, ','));
+  if (proto.startsWith('ICMP') && c.itype[i] >= 0) parts.push(`icmp=${c.itype[i]}/${c.icode[i]}`);
+  const rs = D.rule.list[c.rule[i]]; if (rs) parts.push(`rule=${rs}${ruleLabel(rs) ? ' "' + ruleLabel(rs) + '"' : ''}`);
+  return parts.join(' ');
+}
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); } catch { const t = el('textarea'); t.value = text; document.body.append(t); t.select(); document.execCommand('copy'); t.remove(); }
+  if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = '⧉', 900); }
+}
 function renderEvents() {
   const c = D.c, n = SEL.length;
   const pages = Math.max(1, Math.ceil(n / PAGE));
   if (F.page >= pages) F.page = pages - 1;
   const tb = $('#ev'); tb.textContent = '';
+  const cols = EV_COLS.filter(col => !col.when || col.when());
+  const sortId = F.sort.replace(/^-/, ''), desc = F.sort.startsWith('-');
+  const sortCol = cols.find(col => col.id === sortId && col.rank);
+  const active = sortCol ? sortId : 'time';
   const hr = el('tr');
-  const multiHost = D.host.list.length > 2;
-  const heads = ['Time', 'Action', ...(multiHost ? ['Host'] : []), 'In', 'Out', 'Proto', 'Source', ...(D.geo ? ['CC'] : []), 'SPT', 'Destination', 'DPT', 'Len', 'TTL', 'Flags / ICMP', ...(D.hasRules ? ['Rule'] : [])];
-  for (const h of heads) hr.append(el('th', null, h));
+  hr.append(el('th', 'cpcol'));
+  for (const col of cols) {
+    const th = el('th', null, col.label);
+    if (col.id === 'time' || col.rank) {
+      th.classList.add('sortable'); th.tabIndex = 0;
+      const on = col.id === active, up = col.id === 'time' ? F.oldestFirst : !desc;
+      if (on) { th.classList.add('sorted'); th.append(el('span', 'arrow', up ? ' ▲' : ' ▼')); th.setAttribute('aria-sort', up ? 'ascending' : 'descending'); }
+      th.title = col.id === 'time' ? 'Sort by time (click again to flip)' : `Sort by ${col.label} (click again to flip; ties stay in time order)`;
+      const go = () => {
+        if (col.id === 'time') { F.oldestFirst = active === 'time' ? !F.oldestFirst : false; F.sort = ''; $('#oldestFirst').checked = F.oldestFirst; }
+        else F.sort = active === col.id && !desc ? '-' + col.id : col.id;
+        F.page = 0; renderEvents(); saveView();
+      };
+      th.onclick = go; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+    }
+    hr.append(th);
+  }
   tb.append(hr);
+  const rows = sortCol ? eventRows(sortCol, desc) : null;
   const startK = F.page * PAGE;
   for (let r = 0; r < PAGE && startK + r < n; r++) {
     const k = startK + r;
-    const i = SEL[F.oldestFirst ? k : n - 1 - k];
+    const i = rows ? rows[k] : SEL[F.oldestFirst ? k : n - 1 - k];
     const tr = el('tr');
-    const td = (text, cls, tok) => { const d = el('td', cls, text); if (tok) { d.classList.add('clk'); d.onclick = e => addToken(tok, e.shiftKey); } tr.append(d); return d; };
-    td(fmtTime(c.ts[i]));
-    const g = D.actGroup[c.act[i]];
-    const ad = el('td'); const sp = el('span', 'act'); const key = el('i', 'key'); key.style.background = `var(${GROUPS[g].css})`; sp.append(key, document.createTextNode(D.act.list[c.act[i]])); ad.append(sp); tr.append(ad);
-    if (multiHost) td(D.host.list[c.host[i]], null, D.host.list[c.host[i]] ? 'host:' + D.host.list[c.host[i]] : null);
-    const iin = D.iface.list[c.iin[i]], iout = D.iface.list[c.iout[i]];
-    const ifTd = (dev, dir) => { const d = td(ifLabel(dev) || dev, ifLabel(dev) ? null : 'mono', dev ? dir + ':' + dev : null); if (ifLabel(dev)) d.title = dev; };
-    ifTd(iin, 'in'); ifTd(iout, 'out');
+    const td = (text, cls, tok) => { const d = el('td', cls, text); if (tok) { d.classList.add('clk'); d.onclick = e => addToken(tok, e.shiftKey); keyable(d, null, e => addToken(tok, e.shiftKey)); } tr.append(d); return d; };
+    const cp = el('button', 'cp', '⧉'); cp.title = 'Copy this event as one line'; cp.onclick = () => copyText(eventLine(i), cp);
+    const cpd = el('td', 'cpcol'); cpd.append(cp); tr.append(cpd);
     const proto = D.proto.list[c.proto[i]];
-    td(proto, null, 'proto:' + proto);
-    const src = D.ip.list[c.src[i]], dst = D.ip.list[c.dst[i]];
-    td(src, 'mono', src ? 'src:' + src : null);
-    if (D.geo) { const x = D.ipCC[c.src[i]], cc = x >= 0 ? D.cc.list[x] : ''; const d = td(cc, null, cc ? 'cc:' + cc : null); if (cc) d.title = ccName(cc) + (D.ipAS[c.src[i]] >= 0 ? ', ' + D.asn.list[D.ipAS[c.src[i]]] + ' ' + (D.asnOrg[D.ipAS[c.src[i]]] || '') : ''); }
-    td(c.spt[i] >= 0 ? String(c.spt[i]) : '', null, c.spt[i] >= 0 ? 'spt:' + c.spt[i] : null);
-    td(dst, 'mono', dst ? 'dst:' + dst : null);
-    const dp = c.dpt[i];
-    const dtd = td(dp >= 0 ? String(dp) + (svcName(dp) ? ' ' + svcName(dp) : '') : '', null, dp >= 0 ? 'dpt:' + dp : null);
-    td(c.len[i] >= 0 ? String(c.len[i]) : ''); td(c.ttl[i] >= 0 ? String(c.ttl[i]) : '');
-    let extra = flagStr(c.flags[i]);
-    if (proto.startsWith('ICMP') && c.itype[i] >= 0) extra = `type ${c.itype[i]}/${c.icode[i]} ${icmpName(proto, c.itype[i])}`;
-    td(extra, 'mono');
-    if (D.hasRules) { const rs = D.rule.list[c.rule[i]]; const d = td(rs ? ruleName(rs) : '', 'mono', rs ? 'rule:' + rs : null); if (rs) d.title = rs; }
+    for (const col of cols) switch (col.id) {
+      case 'time': td(fmtTime(c.ts[i])); break;
+      case 'act': { const g = D.actGroup[c.act[i]]; const ad = el('td'); const sp = el('span', 'act'); const key = el('i', 'key'); key.style.background = `var(${GROUPS[g].css})`; sp.append(key, document.createTextNode(D.act.list[c.act[i]])); ad.append(sp); tr.append(ad); break; }
+      case 'host': td(D.host.list[c.host[i]], null, D.host.list[c.host[i]] ? 'host:' + D.host.list[c.host[i]] : null); break;
+      case 'in': case 'out': { const dev = D.iface.list[col.id === 'in' ? c.iin[i] : c.iout[i]]; const d = td(ifLabel(dev) || dev, ifLabel(dev) ? null : 'mono', dev ? col.id + ':' + dev : null); if (ifLabel(dev)) d.title = dev; break; }
+      case 'proto': td(proto, null, 'proto:' + proto); break;
+      case 'src': case 'dst': { const ip = D.ip.list[col.id === 'src' ? c.src[i] : c.dst[i]]; td(ip, 'mono', ip ? col.id + ':' + ip : null); break; }
+      case 'cc': { const x = D.ipCC[c.src[i]], cc = x >= 0 ? D.cc.list[x] : ''; const d = td(cc, null, cc ? 'cc:' + cc : null); if (cc) d.title = ccName(cc) + (D.ipAS[c.src[i]] >= 0 ? ', ' + D.asn.list[D.ipAS[c.src[i]]] + ' ' + (D.asnOrg[D.ipAS[c.src[i]]] || '') : ''); break; }
+      case 'spt': td(c.spt[i] >= 0 ? String(c.spt[i]) : '', null, c.spt[i] >= 0 ? 'spt:' + c.spt[i] : null); break;
+      case 'dpt': { const dp = c.dpt[i]; td(dp >= 0 ? String(dp) + (svcName(dp) ? ' ' + svcName(dp) : '') : '', null, dp >= 0 ? 'dpt:' + dp : null); break; }
+      case 'len': td(c.len[i] >= 0 ? String(c.len[i]) : ''); break;
+      case 'ttl': td(c.ttl[i] >= 0 ? String(c.ttl[i]) : ''); break;
+      case 'flags': { let extra = flagStr(c.flags[i]); if (proto.startsWith('ICMP') && c.itype[i] >= 0) extra = `type ${c.itype[i]}/${c.icode[i]} ${icmpName(proto, c.itype[i])}`; td(extra, 'mono'); break; }
+      case 'rule': { const rs = D.rule.list[c.rule[i]]; const d = td(rs ? ruleName(rs) : '', 'mono', rs ? 'rule:' + rs : null); if (rs) d.title = rs; break; }
+    }
     tb.append(tr);
   }
   $('#evSub').textContent = `${fmtN(n)} matching`;
   $('#pgText').textContent = n ? `${fmtN(startK + 1)}–${fmtN(Math.min(n, startK + PAGE))} of ${fmtN(n)}` : 'no events match';
   $('#pgNew').disabled = F.page === 0; $('#pgOld').disabled = F.page >= pages - 1;
-  $('#pgNew').textContent = F.oldestFirst ? '◀ Older' : '◀ Newer'; $('#pgOld').textContent = F.oldestFirst ? 'Newer ▶' : 'Older ▶';
+  $('#pgNew').textContent = sortCol ? '◀ Previous' : F.oldestFirst ? '◀ Older' : '◀ Newer';
+  $('#pgOld').textContent = sortCol ? 'Next ▶' : F.oldestFirst ? 'Newer ▶' : 'Older ▶';
 }
 $('#pgNew').onclick = () => { F.page--; renderEvents(); };
 $('#pgOld').onclick = () => { F.page++; renderEvents(); };
@@ -1806,8 +2055,10 @@ $('#oldestFirst').onchange = e => { F.oldestFirst = e.target.checked; F.page = 0
 
 /* ============================================================ exports */
 let outName = 'export.txt';
-function showOut(title, note, text, name) {
+function showOut(title, note, text, name, links = []) {
   $('#outTitle').textContent = title; $('#outNote').textContent = note; $('#outText').value = text; outName = name;
+  const box = $('#outLinks'); box.textContent = '';
+  for (const [label, href] of links) { const a = el('a', null, label + ' ↗'); a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; box.append(a); }
   $('#outDlg').showModal();
 }
 $('#outClose').onclick = () => $('#outDlg').close();
@@ -1842,8 +2093,154 @@ $('#btnRules').onclick = () => {
   showOut('ufw deny rules', `Top ${r.length} public sources in the current filter (private, multicast and broadcast addresses left out). Review before running: insert 1 puts each rule above your allow rules, and an IPv6 source needs IPv6 enabled in /etc/default/ufw. Sources UFW already blocks gain nothing from a deny rule; this is mostly useful for sources hitting ports you allow.`, text, 'ufw-deny.sh');
 };
 
+/* ============================================================ abuse report
+   A plain-text report about one source, in the shape abuse desks expect: UTC times, what was targeted,
+   how often, and sample lines. Nothing is sent: it opens in the output dialog for you to review,
+   copy or save. Internal details (interface and rule names) are left out of the sample lines. */
+const LOGIN_PORTS = { 21: 'FTP', 22: 'SSH', 23: 'Telnet', 25: 'SMTP', 110: 'POP3', 143: 'IMAP', 445: 'SMB', 993: 'IMAPS', 995: 'POP3S', 1433: 'MSSQL', 2222: 'SSH', 3306: 'MySQL', 3389: 'RDP', 5432: 'PostgreSQL', 5900: 'VNC', 5985: 'WinRM' };
+const durWords = ms => fmtDur(ms).replace(/^([\d.]+)([smhd])$/, (_, n, u) => `${n} ${{ s: 'second', m: 'minute', h: 'hour', d: 'day' }[u]}${n === '1' ? '' : 's'}`);
+const utc = t => t === t ? new Date(t).toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC') : '?';
+function abuseLine(i) {
+  const c = D.c, proto = D.proto.list[c.proto[i]];
+  const ep = (ip, p) => p >= 0 ? (ip.includes(':') ? `[${ip}]:${p}` : `${ip}:${p}`) : ip;
+  let s = `${utc(c.ts[i])}  ${D.act.list[c.act[i]].padEnd(11)} ${proto.padEnd(5)} ${ep(D.ip.list[c.src[i]], c.spt[i])} -> ${ep(D.ip.list[c.dst[i]], c.dpt[i])}`;
+  if (c.flags[i] & ~FLAGS.DF) s += '  ' + flagStr(c.flags[i] & ~FLAGS.DF);
+  if (proto.startsWith('ICMP') && c.itype[i] >= 0) s += `  icmp ${c.itype[i]}/${c.icode[i]} ${icmpName(proto, c.itype[i])}`;
+  return s;
+}
+function abuseSource() {
+  if (!SEL.length) return null;
+  const first = D.c.src[SEL[0]];
+  for (let k = 1; k < SEL.length; k++) if (D.c.src[SEL[k]] !== first) return null;
+  return D.ip.list[first] ? first : null;
+}
+function abuseReport() {
+  const src = abuseSource();
+  if (src === null) { alert('Filter to a single source first: click an address in the Sources list, the Scans table or the event table, then press Abuse report again.'); return; }
+  const ip = D.ip.list[src], c = D.c, G = D.actGroup;
+  if (D.ipc[src] & 7) { alert(`${ip} is a private, multicast or broadcast address, so there's no outside network to report it to.`); return; }
+  // stats over the current selection (all rows are this source)
+  const ports = new Map(), protos = new Map(), dsts = new Set(), s = { ports: new Map(), dsts: new Set(), n: 0, first: Infinity, last: -Infinity };
+  let blocked = 0, first = Infinity, last = -Infinity;
+  for (const i of SEL) {
+    const t = c.ts[i]; if (t === t) { if (t < first) first = t; if (t > last) last = t; }
+    const p = c.dpt[i], pr = D.proto.list[c.proto[i]];
+    if (p >= 0) ports.set(p, (ports.get(p) || 0) + 1);
+    protos.set(pr, (protos.get(pr) || 0) + 1); dsts.add(c.dst[i]);
+    if (G[c.act[i]] <= 1) {
+      blocked++;
+      if (p >= 0) { const v = s.ports.get(p); if (v) v.n++; else s.ports.set(p, { n: 1, t }); s.n++; if (s.dsts.size < 64) s.dsts.add(c.dst[i]); if (t === t) { if (t < s.first) s.first = t; if (t > s.last) s.last = t; } }
+    }
+  }
+  const pat = scanPattern(s);
+  const topPorts = [...ports].sort((a, b) => b[1] - a[1]);
+  const [tp, tn] = topPorts[0] || [-1, 0];
+  const svc = p => LOGIN_PORTS[p] || svcName(p).toUpperCase();
+  const what = {
+    'fast sweep': `a fast port scan: ${fmtN(s.ports.size)} ports probed within ${durWords(s.span)}`,
+    'slow scan': `a slow port scan: ${fmtN(s.ports.size)} ports probed over ${durWords(s.span)}`,
+    'port scan': `a port scan of ${fmtN(s.ports.size)} different ports`,
+    'host sweep': `a sweep of port ${tp}${svc(tp) ? ' (' + svc(tp) + ')' : ''} across ${s.dsts.size >= 64 ? '64 or more' : s.dsts.size} of our addresses`,
+    'hammering': `${fmtN(tn)} repeated connection attempts to port ${tp}${svc(tp) ? ' (' + svc(tp) + ')' : ''}` + (LOGIN_PORTS[tp] ? ', consistent with brute-force login attempts' : ''),
+  }[pat] || `connection attempts to ${topPorts.length === 1 ? 'port ' + tp : fmtN(topPorts.length) + ' different ports'}`;
+  const net = D.geo && D.ipAS[src] >= 0 ? `${D.asnOrg[D.ipAS[src]] || ''} (${D.asn.list[D.ipAS[src]]})`.trim() : '';
+  const country = D.geo && D.ipCC[src] >= 0 ? ccName(D.cc.list[D.ipCC[src]]) : '';
+  const verb = blocked === SEL.length ? 'logged and blocked' : 'logged';
+  // sample lines: the first and last few, plus an even spread in between
+  const pick = new Set(), n = SEL.length, want = Math.min(n, 15);
+  for (let k = 0; k < Math.min(5, n); k++) { pick.add(k); pick.add(n - 1 - k); }
+  for (let k = 0; pick.size < want; k++) pick.add(Math.floor(k * (n - 1) / Math.max(1, want - 1)));
+  const sample = [...pick].sort((a, b) => a - b).map(k => '  ' + abuseLine(SEL[k]));
+  const row = (k, v) => `  ${(k + ':').padEnd(19)}${v}`;
+  const lines = [
+    `Subject: Abuse report: ${ip}, ${pat || 'unwanted traffic'} (${fmtN(SEL.length)} connection attempts)`,
+    '',
+    'Hello,',
+    '',
+    `We are reporting unwanted traffic from ${ip}${net ? `, which belongs to your network ${net}` : ''}. Between ${utc(first)} and ${utc(last)}, our firewall ${verb} ${fmtN(SEL.length)} connection attempts from this address: ${what}.`,
+    '',
+    'Summary',
+    row('Source address', ip),
+    ...(net || country ? [row('Network', [net, country].filter(Boolean).join(', '))] : []),
+    row('First seen', utc(first)),
+    row('Last seen', utc(last)),
+    row('Events', fmtN(SEL.length) + (blocked !== SEL.length ? ` (${fmtN(blocked)} blocked)` : ', all blocked')),
+    row('Target ports', topPorts.slice(0, 10).map(([p, k]) => `${p}${svcName(p) ? '/' + svcName(p) : ''} ×${fmtN(k)}`).join(', ') + (topPorts.length > 10 ? `, and ${fmtN(topPorts.length - 10)} more` : '')),
+    row('Protocols', [...protos].sort((a, b) => b[1] - a[1]).map(([p, k]) => `${p} ×${fmtN(k)}`).join(', ')),
+    row('Target addresses', fmtN(dsts.size)),
+    '',
+    `Sample log entries (${sample.length} of ${fmtN(SEL.length)}, times in UTC):`,
+    ...sample,
+    '',
+    'Please investigate this host and take appropriate action. We can provide further log excerpts on request.',
+    '',
+    'Regards,',
+    '',
+  ];
+  showOut(`Abuse report: ${ip}`,
+    'Review before sending: the sample lines include your own addresses as the targets, which abuse desks usually need to find the traffic. Nothing is sent from here. Find the abuse contact for the network with the lookups below, or "whois ' + ip + '" in a terminal (look for abuse-mailbox or OrgAbuseEmail).',
+    lines.join('\n'), `abuse-report-${ip.replace(/[:.]/g, '-')}.txt`,
+    [[`RDAP record for ${ip} (look for the "abuse" entity)`, 'https://rdap.org/ip/' + encodeURIComponent(ip)], ['Report on AbuseIPDB', 'https://www.abuseipdb.com/report?ip=' + encodeURIComponent(ip)]]);
+}
+$('#btnAbuse').onclick = () => abuseReport();
+
+/* ============================================================ saved report
+   A standalone HTML snapshot of the current view: the same CSS, the rendered summary, charts, map, lists,
+   New card and scan table, but no event table, controls or script. Raw events never go into it. */
+function saveReport() {
+  const live = $('#dash'), dash = live.cloneNode(true);
+  // selects become plain text showing what was picked
+  const liveSel = live.querySelectorAll('select'), copySel = dash.querySelectorAll('select');
+  copySel.forEach((s, k) => { const o = liveSel[k].selectedOptions[0]; s.replaceWith(el('span', 'report-pick', o ? o.textContent : '')); });
+  const win = dash.querySelector('#newWin'); if (win) win.replaceWith(el('span', 'report-pick', live.querySelector('#newWin .on')?.textContent || ''));
+  dash.querySelector('.filters')?.closest('.card')?.remove();
+  dash.querySelector('#ev')?.closest('.card')?.remove();
+  dash.querySelectorAll('button, input, .hint, #tip').forEach(e => e.remove());
+  dash.querySelectorAll('[title="Filter to this source"]').forEach(e => e.removeAttribute('title'));
+  dash.querySelectorAll('[tabindex], [role=button]').forEach(e => { e.removeAttribute('tabindex'); e.removeAttribute('role'); e.removeAttribute('aria-label'); });
+  dash.removeAttribute('hidden'); dash.removeAttribute('id');
+
+  // what this report shows
+  const meta = el('div', 'card report-meta'), rows = [];
+  const now = new Date();
+  const win2 = timeWindow();
+  rows.push(['Generated', `${now.toLocaleString()} (${BROWSER_TZ})`]);
+  rows.push(['Time', F.range ? `${fmtTime(F.range[0])} – ${fmtTime(F.range[1])}` : F.preset === 'all' ? `all loaded (${fmtTime(D.minTs)} – ${fmtTime(D.maxTs)})` : `last ${F.preset} of the logs (${fmtTime(win2[0])} – ${fmtTime(Math.min(win2[1], D.maxTs))})`]);
+  rows.push(['Filter', F.q.trim() || 'none']);
+  const hiddenActs = GROUPS.filter((g, k) => !F.acts[k]).map(g => g.name);
+  const toggles = [hiddenActs.length ? 'hiding ' + hiddenActs.join(', ') : '', F.hideNoise ? 'broadcast/multicast hidden' : '', F.publicOnly ? 'public sources only' : ''].filter(Boolean);
+  if (toggles.length) rows.push(['Options', toggles.join('; ')]);
+  rows.push(['Events', `${fmtN(SEL.length)} shown of ${fmtN(D.n)} loaded`]);
+  rows.push(['Sources', D.files.map(f => f.name).join(', ')]);
+  const dl = el('dl');
+  for (const [k, v] of rows) dl.append(el('dt', null, k), el('dd', null, v));
+  meta.append(dl, el('p', 'report-note', 'Summary only: individual log lines are not included. Addresses, ports and (if loaded) rule and interface names are.'));
+
+  const head = el('header', 'top');
+  const h1 = el('h1'); const logo = document.querySelector('header.top h1 .logo'); if (logo) h1.append(logo.cloneNode(true));
+  h1.append('fwscope '); h1.append(el('span', null, '// firewall log report'));
+  head.append(h1);
+  const wrap = el('div', 'wrap'); wrap.append(head, meta, dash);
+
+  const css = [...document.querySelectorAll('style')].map(s => s.textContent).join('\n') +
+    '\n* { cursor: default !important; }\n.report-meta dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 0; font-size: 13px; }\n' +
+    '.report-meta dt { color: var(--muted); }\n.report-meta dd { margin: 0; word-break: break-word; }\n.report-note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }\n' +
+    '.report-pick { font-size: 13px; font-weight: 600; }\n.stack { padding-bottom: 24px; }\n@media print { .card { break-inside: avoid; } }\n';
+  const theme = document.documentElement.dataset.theme;
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+  const favicon = document.querySelector('link[rel=icon]')?.outerHTML || '';
+  const html = `<!doctype html>\n<html lang="en"${theme ? ` data-theme="${theme}"` : ''}>\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n` +
+    `<title>fwscope report ${stamp}</title>\n${favicon}\n<style>${css}</style>\n</head>\n<body>\n${wrap.outerHTML}\n</body>\n</html>\n`;
+  download(`fwscope-report-${stamp}.html`, html, 'text/html');
+  return html;
+}
+$('#btnReport').onclick = () => saveReport();
+
 /* ============================================================ sample data */
 function makeSample() {
+  // zone-less lines (syslog, Windows) are written in the zone the page reads them in (see wallTime)
+  const wallFmt = LOAD.tz ? new Intl.DateTimeFormat('en-US', { timeZone: LOAD.tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }) : null;
+  const wall = d => { if (!wallFmt) return { y: d.getFullYear(), mo: d.getMonth(), d: d.getDate(), h: d.getHours(), mi: d.getMinutes(), s: d.getSeconds() }; const p = {}; for (const x of wallFmt.formatToParts(d)) p[x.type] = +x.value; return { y: p.year, mo: p.month - 1, d: p.day, h: p.hour, mi: p.minute, s: p.second }; };
   let seed = 1337;
   const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const pick = a => a[Math.floor(rnd() * a.length)];
@@ -1929,9 +2326,10 @@ function makeSample() {
   return '#Version: 1.5\n#Software: Microsoft Windows Firewall\n#Time Format: Local\n#Host: DESKTOP-LAN60\n' +
     '#Fields: date time action protocol src-ip dst-ip src-port dst-port size tcpflags tcpsyn tcpack tcpwin icmptype icmpcode info path pid\n' + ev.map(e => {
     const d = new Date(e.t + ri(0, 999));
+    const w = wall(d);
     if (e.win) {
       const tcp = e.proto === 'TCP' && e.path === 'RECEIVE', icmp = e.proto === 'ICMP';
-      return [`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`, e.act, e.proto, e.src, e.dst,
+      return [`${w.y}-${pad(w.mo + 1)}-${pad(w.d)}`, `${pad(w.h)}:${pad(w.mi)}:${pad(w.s)}`, e.act, e.proto, e.src, e.dst,
         icmp ? '-' : e.spt, icmp ? '-' : e.dpt, e.len, tcp ? e.flags : '-', tcp ? ri(1, 4e9) : '-', tcp ? 0 : '-', tcp ? 64240 : '-', icmp ? e.itype : '-', icmp ? 0 : '-', '-', e.path, e.act === 'ALLOW' ? pick([4, 3812, 10244]) : 4].join(' ');
     }
     if (e.opn) {
@@ -1941,7 +2339,7 @@ function makeSample() {
       if (e.proto === 'tcp') csv += `${e.spt},${e.dpt},0,${e.flags},${ri(1, 4e9)},,${pick([1024, 64240, 65535])},,mss;sackOK;TS;nop;wscale`;
       else if (e.proto === 'udp') csv += `${e.spt},${e.dpt},${Math.max(8, e.len - 28)}`;
       else csv += `request,${ri(1, 65535)},${ri(1, 20)}`;
-      if (e.bsd) return `${MONS[d.getMonth()]} ${String(d.getDate()).padStart(2, ' ')} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} opnsense filterlog[${ri(10000, 99999)}]: ${csv}`;
+      if (e.bsd) return `${MONS[w.mo]} ${String(w.d).padStart(2, ' ')} ${pad(w.h)}:${pad(w.mi)}:${pad(w.s)} opnsense filterlog[${ri(10000, 99999)}]: ${csv}`;
       const off = -d.getTimezoneOffset(), oh = `${off >= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(off) / 60))}:${pad(Math.abs(off) % 60)}`;
       return `<134>1 ${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${oh} ${e.host} filterlog ${ri(10000, 99999)} - [meta sequenceId="${ri(1, 99999)}"] ${csv}`;
     }
@@ -1955,7 +2353,7 @@ function makeSample() {
     else s += `PROTO=${e.proto}`;
     if (e.iso) { const off = -d.getTimezoneOffset(); const oh = `${off >= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(off) / 60))}:${pad(Math.abs(off) % 60)}`;
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, '0')}123${oh} ${e.host} kernel: ${s}`; }
-    return `${MONS[d.getMonth()]} ${String(d.getDate()).padStart(2, ' ')} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${e.host} kernel: [${up}] ${s}`;
+    return `${MONS[w.mo]} ${String(w.d).padStart(2, ' ')} ${pad(w.h)}:${pad(w.mi)}:${pad(w.s)} ${e.host} kernel: [${up}] ${s}`;
   }).join('\n');
 }
 
@@ -1971,7 +2369,7 @@ IDB.all().then(rows => { for (const r of rows) { try { addGeo(r.name, r.buf, fal
 $('#btnPaste').onclick = () => { $('#pasteText').value = ''; $('#pasteDlg').showModal(); };
 $('#pasteCancel').onclick = () => $('#pasteDlg').close();
 $('#pasteGo').onclick = () => { const t = $('#pasteText').value; $('#pasteDlg').close(); if (t.trim()) loadText('pasted text', t); };
-$('#btnClear').onclick = () => { D = null; $('#dash').hidden = true; $('#empty').hidden = false; $('#btnClear').hidden = true; F.range = null; F.preset = 'all'; F.acts = [true, true, true, true]; setQueryText(''); };
+$('#btnClear').onclick = () => { D = null; $('#dash').hidden = true; $('#empty').hidden = false; $('#btnClear').hidden = true; $('#btnReport').hidden = true; F.range = null; F.preset = 'all'; F.acts = [true, true, true, true]; setQueryText(''); };
 $('#btnReset').onclick = () => { setView(structuredClone(VIEW_DEFAULT)); if (D && D.n) { buildActChips(); setQuery(''); } else saveView(); };
 function setQueryText(q) { $('#q').value = q; F.q = q; F.preds = []; $('#qerr').textContent = ''; }
 // drag & drop anywhere on the page
@@ -1989,6 +2387,16 @@ addEventListener('drop', e => { e.preventDefault(); $('#drop').classList.remove(
     try { localStorage.setItem('ufwviz-theme', next); } catch {}
     if (D && D.n) renderTimeline(); // SVG colors are read from CSS at draw time
   };
+})();
+// ?demo opens straight on the sample data and ?theme=dark|light forces a theme (screenshots, demos);
+// neither changes anything saved in the browser
+(function urlOptions() {
+  const q = new URLSearchParams(location.search);
+  if (['dark', 'light'].includes(q.get('theme'))) document.documentElement.dataset.theme = q.get('theme');
+  // ?tz=UTC: read zone-less logs in that zone for this visit only (not saved)
+  const tz = q.get('tz');
+  if (tz && [...$('#optTz').options].some(o => o.value === tz)) { LOAD.tz = tz; $('#optTz').value = tz; }
+  if (q.has('demo')) { resetStore(); D.demoGeo = true; loadText('sample (generated)', makeSample()); }
 })();
 </script>
 </body>
