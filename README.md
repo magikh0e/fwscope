@@ -1,10 +1,10 @@
-<p align="center"><img src="assets/fwscope-badge.webp" alt="fwscope: firewall and WAF log visualizer" width="320"></p>
+<p align="center"><img src="assets/fwscope-badge.webp" alt="fwscope: firewall, WAF and IDS log visualizer" width="320"></p>
 
 # fwscope
 
 [![tests](https://github.com/magikh0e/fwscope/actions/workflows/test.yml/badge.svg)](https://github.com/magikh0e/fwscope/actions/workflows/test.yml)
 
-A single-file, offline visualizer for firewall and WAF logs: UFW, nftables / iptables / firewalld, OPNsense / pfSense, Windows Firewall, OpenWrt, AWS VPC and Azure flow logs, fail2ban, Suricata, ModSecurity / Coraza, and Cloudflare firewall events. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box. The one exception is the optional hostname lookup, which is off unless you turn it on (see [Hostnames](#hostnames-reverse-dns)).
+A single-file, offline visualizer for firewall, WAF and IDS/IPS logs: UFW, nftables / iptables / firewalld, OPNsense / pfSense, Windows Firewall, OpenWrt, AWS VPC and Azure flow logs, fail2ban, Suricata, ModSecurity / Coraza, and Cloudflare firewall events. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box. The one exception is the optional hostname lookup, which is off unless you turn it on (see [Hostnames](#hostnames-reverse-dns)).
 
 ![fwscope dashboard on a week of sample firewall and WAF logs: summary tiles, events over time split into firewall and WAF panels, a world map of sources with the top networks, and what blocking mode would do at each anomaly threshold](assets/screenshot.png)
 
