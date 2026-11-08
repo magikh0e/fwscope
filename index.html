@@ -205,6 +205,10 @@ tr:hover .cp, .cp:focus-visible { opacity: 1; }
 .why { color: var(--muted); font-size: 11.5px; margin-left: 6px; font-weight: 400; }
 .rdns { color: var(--muted); font-family: system-ui, sans-serif; font-size: 11px; font-weight: 400; }
 .rdns.unconf { font-style: italic; }
+#blockTable td.pick { width: 1px; }
+#blockTable .why2 { color: var(--ink-2); font-size: 12px; }
+.block-foot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+#blockAllow { width: 320px; max-width: 100%; font-family: var(--mono); font-size: 12px; }
 .newnote { background: var(--surface-2); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
 
 /* map */
@@ -434,9 +438,26 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       </div>
     </div>
 
+    <div class="card" id="blockCard" hidden>
+      <div class="card-head"><h2>Block suggestions</h2><span class="sub" id="blockSub"></span><span class="grow"></span>
+        <label class="tog">Script for <select id="blockFmt">
+          <option value="ufw">UFW</option><option value="ipset">iptables + ipset</option><option value="nft">nftables</option>
+          <option value="opnalias">OPNsense alias list</option><option value="opnapi">OPNsense API script</option>
+          <option value="win">Windows Firewall</option><option value="modsec">ModSecurity</option></select></label>
+        <button id="btnBlock">Write script</button></div>
+      <div class="tbl-wrap"><table id="blockTable"></table></div>
+      <div class="block-foot">
+        <label class="tog" title="Addresses or ranges that are never suggested, e.g. your office, monitoring or VPN. Comma or space separated, CIDR allowed. Kept in this browser.">Never block
+          <input type="text" id="blockAllow" spellcheck="false" placeholder="198.51.100.10, 203.0.113.0/24"></label>
+        <span id="blockAllowErr" class="qerr"></span>
+        <label class="tog" title="Sources whose every request was intercepted by the WAF. Blocking them changes little, so they're hidden by default."><input type="checkbox" id="blockDropped"> Also show intercepted sources</label>
+      </div>
+      <div class="hint">Based on your WAF logs: sources the WAF caught attacking (web scans, web hammering, attack rules, fake crawlers) whose requests still reached the web app, as they do in detection-only mode. Firewall logs, if loaded, only add supporting evidence (a port scan, "firewall + WAF"); traffic your firewall already drops isn't a reason to block anything. Never suggested: your own and LAN addresses, Cloudflare's ranges, verified crawlers, and your never-block list. Three or more strong attackers in one /24 (IPv6 /64) are also offered as the whole range. Tick what to block, then write a script; nothing is applied from here.</div>
+    </div>
+
     <div class="card">
       <div class="card-head"><h2>Events</h2><span class="sub" id="evSub"></span><span class="grow"></span>
-        <button id="btnCsv">Export CSV</button><button id="btnIps">Source IP list</button><button id="btnRules">ufw deny rules</button><button id="btnAbuse" title="Draft a report to the network owner about one source. Filter to a single source first, e.g. by clicking it in a list.">Abuse report</button>
+        <button id="btnCsv">Export CSV</button><button id="btnIps">Source IP list</button><button id="btnAbuse" title="Draft a report to the network owner about one source. Filter to a single source first, e.g. by clicking it in a list.">Abuse report</button>
       </div>
       <div class="tbl-wrap"><table id="ev"></table></div>
       <div class="pager"><button id="pgNew">◀ Newer</button><button id="pgOld">Older ▶</button><span id="pgText"></span><span class="grow"></span><label class="tog"><input type="checkbox" id="oldestFirst"> Oldest first</label></div>
@@ -1326,6 +1347,8 @@ function finish() {
   F.page = 0;
   buildActChips();
   autoView();
+  $('#blockFmt').value = blockDefaultFmt();
+  BLOCKSEL = new Set(); // new logs: ticks start from the defaults again
   setQuery(F.q, true); // compiles a restored filter now that there's data to match against
 }
 
@@ -1676,7 +1699,7 @@ const groupRows = (counts, total) => {
 /* ============================================================ render: tiles */
 function renderAll() {
   hideTip(); syncPresets();
-  namesStatus(); rdnsStatus(); renderTiles(); renderTimeline(); renderMap(); renderWhatIf(); renderTuning(); renderNew(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
+  namesStatus(); rdnsStatus(); renderTiles(); renderTimeline(); renderMap(); renderWhatIf(); renderTuning(); renderNew(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderBlock(); renderEvents();
   const f = D.files.map(f => `${f.name} (${fmtN(f.events)}${f.partial ? ', stopped partway' : ''})`).join(', ');
   $('#foot').textContent = `${fmtN(D.n)} events from ${D.files.length} source${D.files.length > 1 ? 's' : ''}: ${f}.` +
     (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') +
@@ -2781,11 +2804,6 @@ $('#btnIps').onclick = () => {
   const r = srcRanking();
   showOut('Source IPs', `${fmtN(r.length)} unique sources in the current filter, busiest first, with event counts.`, r.map(([s, n]) => `${D.ip.list[s]}\t${n}`).join('\n'), 'ufw-sources.txt');
 };
-$('#btnRules').onclick = () => {
-  const r = srcRanking().filter(([s]) => !(D.ipc[s] & 7)).slice(0, 200);
-  const text = r.map(([s, n]) => `sudo ufw insert 1 deny from ${D.ip.list[s]} comment 'fwscope: ${n} events'`).join('\n');
-  showOut('ufw deny rules', `Top ${r.length} public sources in the current filter (private, multicast and broadcast addresses left out). Review before running: insert 1 puts each rule above your allow rules, and an IPv6 source needs IPv6 enabled in /etc/default/ufw. Sources UFW already blocks gain nothing from a deny rule; this is mostly useful for sources hitting ports you allow.`, text, 'ufw-deny.sh');
-};
 
 /* ============================================================ abuse report
    A plain-text report about one source, in the shape abuse desks expect: UTC times, what was targeted,
@@ -2901,6 +2919,183 @@ function abuseReport() {
 }
 $('#btnAbuse').onclick = () => abuseReport();
 
+/* ============================================================ block suggestions
+   Who's worth blocking: sources with attack evidence, weighted up when they got through to something open
+   (allowed/passed connections, or WAF requests the server answered). Excluded: own/LAN addresses, Cloudflare,
+   verified crawlers, the never-block list. Clusters of 3+ attackers in a /24 (or /64) become one range. */
+let BLOCK = [], BLOCKSEL = new Set(), blockShowDropped = false;
+const BLOCK_ALLOW_KEY = 'fwscope-never-block';
+let blockAllow = '';
+try { blockAllow = localStorage.getItem(BLOCK_ALLOW_KEY) || ''; } catch {}
+function allowMatcher() {
+  const parts = blockAllow.split(/[\s,]+/).filter(Boolean);
+  const ms = []; let bad = '';
+  for (const p of parts) { try { if (!ipBits(p.split('/')[0])) throw 0; ms.push(ipMatcher(p)); } catch { bad = p; } }
+  $('#blockAllowErr').textContent = bad ? `not an address or range: ${bad}` : '';
+  return ip => ms.some(m => m(ip));
+}
+const PAT_W = { 'fast sweep': 3, 'slow scan': 3, 'port scan': 2, 'host sweep': 2, 'hammering': 3, 'web scan': 3, 'web hammering': 3, 'fake crawler': 3 };
+function blockCandidates() {
+  const c = D.c, G = D.actGroup, ipc = D.ipc, never = allowMatcher();
+  // your servers: what WAF requests and inbound allowed connections were addressed to (outbound passes go to
+  // arbitrary internet hosts, which must not count as yours)
+  const servers = new Set(); for (const i of SEL) if ((D.waf && D.actWaf[c.act[i]]) || (G[c.act[i]] === 2 && !c.iout[i])) servers.add(c.dst[i]);
+  const per = new Map(); let droppedOnly = 0;
+  for (const i of SEL) {
+    const src = c.src[i]; if (!D.ip.list[src] || (ipc[src] & 7)) continue;
+    let s = per.get(src); if (!s) per.set(src, s = { ports: new Map(), dsts: new Set(), paths: new Map(), uas: new Map(), n: 0, pn: 0, first: Infinity, last: -Infinity, reached: 0, waf: 0, attack: 0 });
+    const t = c.ts[i], g = G[c.act[i]], isWaf = D.waf && D.actWaf[c.act[i]];
+    s.n++;
+    if (t === t) { if (t < s.first) s.first = t; if (t > s.last) s.last = t; }
+    if (isWaf) {
+      s.waf++; s.uas.set(c.ua[i], (s.uas.get(c.ua[i]) || 0) + 1);
+      const v = s.paths.get(c.path[i]); if (v) v.n++; else s.paths.set(c.path[i], { n: 1, t });
+      if (!D.act.list[c.act[i]].startsWith('WAF BLOCK')) s.reached++; // not intercepted: it reached the web app
+      if ((D.wcomboRules[c.wr[i]] || []).some(r => { const id = D.wrule.list[r]; return !isScoreRule(id) && !/^9(11|20)\d{3}$/.test(id); })) s.attack++;
+    } else {
+      const p = c.dpt[i];
+      if (p >= 0 && g <= 1 && !(ipc[c.dst[i]] & 6)) { const v = s.ports.get(p); if (v) v.n++; else s.ports.set(p, { n: 1, t }); s.pn++; if (s.dsts.size < 64) s.dsts.add(c.dst[i]); }
+    }
+  }
+  const out = [];
+  for (const [src, s] of per) {
+    const ip = D.ip.list[src];
+    if (servers.has(src) || inCloudflare(ip) || never(ip)) continue;
+    const topUa = [...s.uas].sort((a, b) => b[1] - a[1])[0];
+    const ck = topUa ? crawlerKind(src, D.ua.list[topUa[0]] || '', s.uas) : '';
+    if (ck === 'crawler') continue;
+    // packet pattern on blocked traffic, web pattern on WAF traffic
+    const ps = { ports: s.ports, dsts: s.dsts, n: s.pn, first: s.first, last: s.last };
+    const pat = s.pn ? scanPattern(ps) : '';
+    let top = 0; for (const v of s.paths.values()) if (v.n > top) top = v.n;
+    const wpat = s.waf >= 50 && top >= 0.8 * s.waf ? 'web hammering' : s.paths.size >= 20 ? 'web scan' : '';
+    const reasons = [];
+    let score = 0;
+    if (pat && PAT_W[pat]) { score += pat === 'port scan' && s.ports.size < 10 ? 1 : PAT_W[pat]; /* a handful of ports over days is background noise */ reasons.push(pat === 'hammering' || pat === 'host sweep' ? `${pat} (port ${[...s.ports].sort((a, b) => b[1].n - a[1].n)[0][0]})` : `${pat} (${fmtN(s.ports.size)} ports)`); }
+    if (wpat) { score += PAT_W[wpat]; reasons.push(wpat === 'web scan' ? `web scan (${fmtN(s.paths.size)} paths)` : `web hammering (${D.path.list[[...s.paths].sort((a, b) => b[1].n - a[1].n)[0][0]]})`); }
+    if (ck === 'fake') { score += PAT_W['fake crawler']; reasons.push('fake crawler'); }
+    if (s.attack) { score += s.attack >= 10 ? 3 : 2; reasons.push(`${fmtN(s.attack)} WAF attack hit${s.attack > 1 ? 's' : ''}`); }
+    // suggestions are based on WAF evidence: what reached the web server. A firewall scan only adds weight.
+    if (!wpat && ck !== 'fake' && !s.attack) continue;
+    // everything this source sent was already dropped: blocking it changes nothing, so hide it unless asked
+    if (!s.reached) { droppedOnly++; if (!blockShowDropped) continue; }
+    if (s.reached) { score += 2; reasons.push(`${fmtN(s.reached)} request${s.reached > 1 ? 's' : ''} reached the web app`); }
+    if (D.both && D.ipSeen[src] === 3) { score += 1; reasons.push('firewall + WAF'); }
+    out.push({ key: ip, ips: [ip], src, score, n: s.n, reached: s.reached, reasons, kinds: reasons.map(r => r.replace(/ \(.*\)$/, '').replace(/^\d[\d,]* /, '').replace(/ \d[\d,]*×$/, '').replace(/s$/, '')) });
+  }
+  // ranges: 3+ candidates in one /24 or /64
+  const bySub = new Map();
+  for (const x of out) { const sub = subnetOf(x.key); let g = bySub.get(sub); if (!g) bySub.set(sub, g = []); g.push(x); }
+  const final = [];
+  for (const [sub, g] of bySub) {
+    const strong = g.filter(x => x.score >= 4);
+    if (strong.length >= 3 && !never(sub.split('/')[0]) && !inCloudflare(sub.split('/')[0])) {
+      const n = g.reduce((a, x) => a + x.n, 0), reached = g.reduce((a, x) => a + x.reached, 0);
+      final.push({ key: sub, ips: g.map(x => x.key), range: true, score: Math.max(...g.map(x => x.score)) + 1, n, reached,
+        reasons: [`${g.length} attacking addresses in this range`].concat([...new Set(g.flatMap(x => x.kinds))].slice(0, 4)) });
+      final.push(...g.filter(x => x.score >= 5)); // strong individual attackers stay visible next to their range
+    } else final.push(...g);
+  }
+  final.sort((a, b) => b.score - a.score || b.reached - a.reached || b.n - a.n);
+  const res = final.slice(0, 100); res.droppedOnly = droppedOnly;
+  return res;
+}
+function renderBlock() {
+  $('#blockCard').hidden = !D.waf;
+  if (!D.waf) return;
+  const tb = $('#blockTable'); tb.textContent = '';
+  BLOCK = blockCandidates();
+  // keep earlier ticks for rows still present; default-tick the strong ones
+  const prev = BLOCKSEL; BLOCKSEL = new Set();
+  // whole ranges start unticked: blocking a /24 should be a deliberate choice
+  for (const x of BLOCK) if (prev.size ? prev.has(x.key) : x.score >= 6 && !x.range) BLOCKSEL.add(x.key);
+  const hidden = !blockShowDropped && BLOCK.droppedOnly ? `${fmtN(BLOCK.droppedOnly)} more whose requests were all intercepted (hidden)` : '';
+  $('#blockSub').textContent = [BLOCK.length ? `${fmtN(BLOCK.length)} attacker${BLOCK.length > 1 ? 's' : ''} that reached the web app` : '', hidden].filter(Boolean).join('; ');
+  $('#btnBlock').disabled = !BLOCK.length;
+  if (!BLOCK.length) { const tr = el('tr'); tr.append(el('td', null, BLOCK.droppedOnly ? `Every attacker the WAF saw in this filter (${fmtN(BLOCK.droppedOnly)}) was already intercepted, so blocking them would change nothing. Tick "Also show intercepted sources" to see them anyway.` : 'No source in this filter shows attack evidence.')); tb.append(tr); return; }
+  const hr = el('tr');
+  const all = el('input'); all.type = 'checkbox'; all.title = 'Tick or untick all'; all.checked = BLOCK.every(x => BLOCKSEL.has(x.key));
+  all.onchange = () => { BLOCKSEL = all.checked ? new Set(BLOCK.map(x => x.key)) : new Set(); renderBlockTicks(); };
+  const th0 = el('th'); th0.append(all); hr.append(th0);
+  for (const h of ['Block', ...(D.geo ? ['Network'] : []), 'Why', 'Reached the web app']) hr.append(el('th', null, h));
+  tb.append(hr);
+  for (const x of BLOCK) {
+    const tr = el('tr');
+    const cb = el('input'); cb.type = 'checkbox'; cb.checked = BLOCKSEL.has(x.key); cb.dataset.key = x.key; cb.setAttribute('aria-label', 'Block ' + x.key);
+    cb.onchange = () => { if (cb.checked) BLOCKSEL.add(x.key); else BLOCKSEL.delete(x.key); $('#blockSub').textContent = `${fmtN(BLOCKSEL.size)} of ${fmtN(BLOCK.length)} ticked`; };
+    const t0 = el('td', 'pick'); t0.append(cb); tr.append(t0);
+    const addr = el('td', 'mono clk', x.key); if (!x.range) rdnsTag(addr, x.key); else addr.title = x.ips.join('\n');
+    addr.onclick = e => addToken('src:' + x.key, e.shiftKey); tr.append(addr);
+    if (D.geo) { const id = D.ip.map.get(x.ips[0]); const cc = id !== undefined && D.ipCC[id] >= 0 ? D.cc.list[D.ipCC[id]] : '', a = id !== undefined && D.ipAS[id] >= 0 ? asnLabel(D.ipAS[id]) : ''; const d = el('td', null, [cc, a].filter(Boolean).join(' · ')); d.style.cssText = 'max-width:200px;overflow:hidden;text-overflow:ellipsis'; tr.append(d); }
+    const gt = el('td', null, x.reached ? `${fmtN(x.reached)} of ${fmtN(x.n)}` : `none of ${fmtN(x.n)}`); gt.title = 'WAF requests that reached the web app (not intercepted), out of all events from this source, firewall ones included';
+    tr.append(el('td', 'why2', x.reasons.join('; ')), gt);
+    tb.append(tr);
+  }
+}
+function renderBlockTicks() { for (const cb of document.querySelectorAll('#blockTable input[data-key]')) cb.checked = BLOCKSEL.has(cb.dataset.key); $('#blockSub').textContent = `${fmtN(BLOCKSEL.size)} of ${fmtN(BLOCK.length)} ticked`; }
+$('#blockAllow').value = blockAllow;
+$('#blockDropped').onchange = e => { blockShowDropped = e.target.checked; if (D && D.n) renderBlock(); };
+$('#blockAllow').onchange = e => { blockAllow = e.target.value.trim(); try { localStorage.setItem(BLOCK_ALLOW_KEY, blockAllow); } catch {} if (D && D.n) renderBlock(); };
+// pick a sensible default script format from what's loaded
+function blockDefaultFmt() { const k = D.kinds; return k.opn ? 'opnalias' : k.ufw ? 'ufw' : k.win ? 'win' : D.waf ? 'modsec' : 'ufw'; }
+function blockScripts(list, fmt) {
+  const v4 = list.filter(x => !x.includes(':')), v6 = list.filter(x => x.includes(':'));
+  const stamp = new Date().toISOString().slice(0, 10);
+  const head = (c) => [`${c} fwscope block list, ${stamp}: ${list.length} entr${list.length === 1 ? 'y' : 'ies'}. Review before running.`];
+  const why = x => { const r = BLOCK.find(b => b.key === x); return r ? r.reasons.join('; ').replace(/'/g, '') : ''; };
+  switch (fmt) {
+    case 'ufw': return {
+      name: 'fwscope-block-ufw.sh', note: 'Run as root. "insert 1" puts each deny above your allow rules, so it also stops these sources reaching services you allow. IPv6 entries need IPV6=yes in /etc/default/ufw.',
+      text: ['#!/bin/sh', ...head('#'), 'set -e', ...list.map(x => `ufw insert 1 deny from ${x} comment 'fwscope: ${why(x).length > 80 ? why(x).slice(0, 80).replace(/[;,]?\s+\S*$/, '') + '...' : why(x)}'`)].join('\n') + '\n',
+      undo: ['#!/bin/sh', '# undo the fwscope block list', ...list.map(x => `ufw delete deny from ${x} || true`)].join('\n') + '\n' };
+    case 'ipset': return {
+      name: 'fwscope-block-ipset.sh', note: 'Run as root. Uses two ipsets with a 7-day timeout (entries expire on their own) and one DROP rule per family at the top of INPUT. ipsets don’t survive a reboot unless you save them (ipset save / netfilter-persistent).',
+      text: ['#!/bin/sh', ...head('#'), 'set -e',
+        'ipset create fwscope4 hash:net family inet timeout 604800 -exist', 'ipset create fwscope6 hash:net family inet6 timeout 604800 -exist',
+        ...v4.map(x => `ipset add fwscope4 ${x} -exist`), ...v6.map(x => `ipset add fwscope6 ${x} -exist`),
+        'iptables -C INPUT -m set --match-set fwscope4 src -j DROP 2>/dev/null || iptables -I INPUT 1 -m set --match-set fwscope4 src -j DROP',
+        'ip6tables -C INPUT -m set --match-set fwscope6 src -j DROP 2>/dev/null || ip6tables -I INPUT 1 -m set --match-set fwscope6 src -j DROP'].join('\n') + '\n',
+      undo: ['#!/bin/sh', '# undo the fwscope block list', 'iptables -D INPUT -m set --match-set fwscope4 src -j DROP 2>/dev/null || true', 'ip6tables -D INPUT -m set --match-set fwscope6 src -j DROP 2>/dev/null || true', 'ipset destroy fwscope4 2>/dev/null || true', 'ipset destroy fwscope6 2>/dev/null || true'].join('\n') + '\n' };
+    case 'nft': return {
+      name: 'fwscope-block.nft.sh', note: 'Run as root. Creates its own table (inet fwscope) with two sets whose entries expire after 7 days, and drops their traffic before your other rules.',
+      text: ['#!/bin/sh', ...head('#'), 'set -e', "nft -f - <<'EOF'", 'table inet fwscope {',
+        '  set block4 { type ipv4_addr; flags interval, timeout; timeout 7d; }', '  set block6 { type ipv6_addr; flags interval, timeout; timeout 7d; }',
+        '  chain input { type filter hook input priority -10; policy accept; ip saddr @block4 drop; ip6 saddr @block6 drop; }', '}', 'EOF',
+        ...(v4.length ? [`nft add element inet fwscope block4 '{ ${v4.join(', ')} }'`] : []), ...(v6.length ? [`nft add element inet fwscope block6 '{ ${v6.join(', ')} }'`] : [])].join('\n') + '\n',
+      undo: ['#!/bin/sh', '# undo the fwscope block list', 'nft delete table inet fwscope'].join('\n') + '\n' };
+    case 'opnalias': return {
+      name: 'fwscope-block-alias.txt', note: 'In OPNsense: Firewall → Aliases → add an alias named fwscope_block, type Network(s), and paste this list into its content. Then add a block rule on WAN (and WAN2 / VPN interfaces as needed) with source fwscope_block, at the top. To undo, empty or delete the alias.',
+      text: list.join('\n') + '\n', undo: '' };
+    case 'opnapi': return {
+      name: 'fwscope-block-opnsense.sh', note: 'Adds the entries to an existing alias (fwscope_block, type Network(s)) through the OPNsense API, which takes effect without reloading the rules. Create the alias and a WAN block rule using it first. Set OPN_HOST, OPN_KEY and OPN_SECRET (System → Access → Users → API keys). curl -k skips certificate checks for a self-signed web UI certificate.',
+      text: ['#!/bin/sh', ...head('#'), ': "${OPN_HOST:?set OPN_HOST}" "${OPN_KEY:?set OPN_KEY}" "${OPN_SECRET:?set OPN_SECRET}"', 'ALIAS=fwscope_block',
+        ...list.map(x => `curl -sk -u "$OPN_KEY:$OPN_SECRET" -H 'Content-Type: application/json' -X POST "https://$OPN_HOST/api/firewall/alias_util/add/$ALIAS" -d '{"address":"${x}"}'; echo`)].join('\n') + '\n',
+      undo: ['#!/bin/sh', '# undo: remove the fwscope entries from the alias', ': "${OPN_HOST:?}" "${OPN_KEY:?}" "${OPN_SECRET:?}"', 'ALIAS=fwscope_block',
+        ...list.map(x => `curl -sk -u "$OPN_KEY:$OPN_SECRET" -H 'Content-Type: application/json' -X POST "https://$OPN_HOST/api/firewall/alias_util/delete/$ALIAS" -d '{"address":"${x}"}'; echo`)].join('\n') + '\n' };
+    case 'win': return {
+      name: 'fwscope-block.ps1', note: 'Run in an admin PowerShell. Adds one inbound Block rule named "fwscope block" covering all the entries.',
+      text: [...head('#'), `$addrs = @(${list.map(x => `'${x}'`).join(', ')})`, "Remove-NetFirewallRule -DisplayName 'fwscope block' -ErrorAction SilentlyContinue",
+        "New-NetFirewallRule -DisplayName 'fwscope block' -Direction Inbound -Action Block -RemoteAddress $addrs -Profile Any | Out-Null", "Write-Host \"Blocked $($addrs.Count) entries\""].join('\r\n') + '\r\n',
+      undo: ["# undo the fwscope block list", "Remove-NetFirewallRule -DisplayName 'fwscope block'"].join('\r\n') + '\r\n' };
+    case 'modsec': {
+      const behindCf = D.viaCf > 0;
+      return {
+        name: 'fwscope-block-modsecurity.conf', note: 'Add to your "before CRS" rules file and reload the web server. This blocks at the web server only; a firewall rule stops traffic earlier.' + (behindCf ? ' Your site is behind Cloudflare, so the rule checks the CF-Connecting-IP header; without mod_remoteip, REMOTE_ADDR is Cloudflare, not the visitor.' : ''),
+        text: [...head('#'), behindCf
+          ? `SecRule REQUEST_HEADERS:CF-Connecting-IP "@ipMatch ${list.join(',')}" \\\n    "id:1000200,phase:1,deny,status:403,log,msg:'fwscope block list'"`
+          : `SecRule REMOTE_ADDR "@ipMatch ${list.join(',')}" \\\n    "id:1000200,phase:1,deny,status:403,log,msg:'fwscope block list'"`].join('\n') + '\n',
+        undo: '# undo: remove rule id 1000200 and reload the web server\n' };
+    }
+  }
+}
+$('#btnBlock').onclick = () => {
+  const list = BLOCK.filter(x => BLOCKSEL.has(x.key)).map(x => x.key);
+  if (!list.length) { alert('Tick at least one row to block.'); return; }
+  const fmt = $('#blockFmt').value, sc = blockScripts(list, fmt);
+  const text = sc.text + (sc.undo ? '\n\n# ---------------- UNDO (save separately) ----------------\n' + sc.undo.split(/\r?\n/).map(l => l.startsWith('#') || !l ? l : '# ' + l).join('\n') : '');
+  showOut(`Block script: ${$('#blockFmt').selectedOptions[0].textContent}`, sc.note + ' Review every entry first: blocking a shared address (a VPN exit, a carrier NAT, a cloud range) can shut out real people.', text, sc.name);
+};
+
 /* ============================================================ saved report
    A standalone HTML snapshot of the current view: the same CSS, the rendered summary, charts, map, lists,
    New card and scan table, but no event table, controls or script. Raw events never go into it. */
@@ -2912,6 +3107,7 @@ function saveReport() {
   const win = dash.querySelector('#newWin'); if (win) win.replaceWith(el('span', 'report-pick', live.querySelector('#newWin .on')?.textContent || ''));
   dash.querySelector('.filters')?.closest('.card')?.remove();
   dash.querySelector('#ev')?.closest('.card')?.remove();
+  dash.querySelector('#blockCard')?.remove();
   dash.querySelectorAll('button, input, .hint, #tip').forEach(e => e.remove());
   dash.querySelectorAll('[title="Filter to this source"]').forEach(e => e.removeAttribute('title'));
   dash.querySelectorAll('#wiTable tr').forEach(e => e.classList.remove('pick'));

@@ -99,7 +99,8 @@ How it maps onto the dashboard:
 - **Event table** with paging. Click any cell to filter on it.
   - **Sorting:** click a column header to sort by it; click again to reverse. Ties stay in time order, IP addresses sort numerically, and empty values go last. It takes well under a second even for millions of events, and the sort is saved with the view.
   - **Copy:** the ⧉ button on each row copies that event as one readable line, e.g. `2026-11-06T09:59:54.000Z BLOCK in=WAN1(vtnet1) TCP 77.67.26.158:30178 -> 66.75.74.68:52802 src_cc=GB len=40 ttl=47 flags=SYN rule=… "WAN1: DSHield Block List"`.
-- **Exports**: CSV of the current filter, a source IP list, and `ufw deny` rules for the top public sources (review those before you run them)
+- **Exports**: CSV of the current filter and a source IP list.
+- **Block suggestions** (with WAF logs): attackers whose requests reached your web app, with a script to block them at the firewall. See [Block suggestions](#block-suggestions).
 - **Save report** (header): writes the current view to one standalone HTML file. It includes the summary, timeline, map, Top lists, New card, heatmap and scans table, plus what filter, time range and files it covers. It has no script and no individual log lines, so you can send it or keep it as a record without sharing your logs. It does include addresses, ports and any rule or interface names you loaded.
 - **Abuse report** (Events card): with the filter narrowed to one outside source, drafts a plain-text report for that network's abuse desk. It includes a subject line, what happened (e.g. "a fast port scan: 1,027 ports probed within 3 minutes" or "repeated connection attempts to port 22 (SSH), consistent with brute-force login attempts"), times in UTC, targeted ports, and 15 sample log lines. Interface and rule names are left out. Nothing is sent: you review it, copy it or save it. Links to the address's RDAP record (where the abuse contact is) and to AbuseIPDB's report form open only if you click them.
 - **Keyboard**: everything that filters on click can also be reached with Tab: Top-list rows, map countries with events, New card rows, scan rows and event table cells. Enter filters, Shift+Enter excludes, and focusing a row shows its tooltip. Table headers sort with Enter.
@@ -213,6 +214,32 @@ Measured on that firewall, in Chrome:
 | 31 days, both load options on | 3.0M of 26M | about a minute | ~250 MB | 51 ms |
 
 For more than a week of a busy firewall, turn on the load options, or load a week at a time.
+
+## Block suggestions
+
+This card shows when WAF logs are loaded. It lists attackers worth blocking at the firewall, and writes a script that blocks the ones you tick. Nothing is applied from the page.
+
+**Based on your WAF logs.** A source is suggested when the WAF caught it attacking and its requests still **reached the web app**, as they do when ModSecurity runs in detection-only (monitor) mode. Attacking here means a web scan, web hammering, attack-rule hits or a fake crawler.
+
+Traffic your firewall already drops isn't a reason to block anything, so firewall logs only add supporting evidence (a port scan, "firewall + WAF"). Sources whose requests were all intercepted are hidden; **Also show intercepted sources** brings them back. The **Reached the web app** column shows how many of each source's events got through.
+
+**Never suggested:** your own and LAN addresses, the servers your WAF and inbound allow rules protect, Cloudflare's ranges (blocking them would take your own site down when it's proxied), verified crawlers, and anything on the **Never block** list under the table. That list takes addresses and CIDR ranges and is kept in your browser.
+
+**Ranges:** when three or more strong attackers share a /24 (IPv6: /64), the whole range is offered as an extra row, unticked. The strongest individual addresses are still listed. The strongest candidates are ticked to start with; tick or untick anything before writing the script.
+
+**Script formats** (the default follows what's loaded):
+
+| Format | What it does | Undo |
+|---|---|---|
+| UFW | `ufw insert 1 deny from … comment '…'`, above your allow rules | `ufw delete deny from …` |
+| iptables + ipset | Two ipsets (v4/v6) with a 7-day timeout, plus one DROP rule each at the top of INPUT | Removes the rules, destroys the sets |
+| nftables | Its own `inet fwscope` table, with sets whose entries expire after 7 days | `nft delete table inet fwscope` |
+| OPNsense alias list | A list to paste into an alias (`fwscope_block`, type Network(s)) used by a block rule on WAN | Empty the alias |
+| OPNsense API script | Adds the entries to that alias with `curl` through `/api/firewall/alias_util/add` (set `OPN_HOST`, `OPN_KEY`, `OPN_SECRET`) | Same, with `/delete` |
+| Windows Firewall | One inbound Block rule, `fwscope block`, via `New-NetFirewallRule` | `Remove-NetFirewallRule -DisplayName 'fwscope block'` |
+| ModSecurity | One `@ipMatch … deny` rule. Behind Cloudflare it checks `CF-Connecting-IP`, since `REMOTE_ADDR` would be Cloudflare | Remove rule 1000200 |
+
+Every script starts with the date and the number of entries, and has its undo script at the bottom, commented out. Review the list first: blocking a shared address (a VPN exit, a carrier NAT, a cloud range) can shut out real people.
 
 ## Hostnames (reverse DNS)
 
