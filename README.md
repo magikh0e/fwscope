@@ -45,7 +45,16 @@ How OPNsense data maps onto the dashboard:
 - The syslog hostname becomes **Host**, so you can merge a router and a server in one view.
 - The matching rule becomes a **Rule** column, a "Firewall rules" Top list, and a `rule:` filter. A plain log only has the rule's 32-character ID, which the page shortens. To see which rule an ID belongs to, look it up in OPNsense under Firewall → Rules.
 
-Plain `filterlog` lines don't contain interface descriptions, so you'll see `igb0` / `vtnet1` rather than WAN / LAN.
+### Rule and interface names
+
+Plain `filterlog` lines only carry IDs: interfaces as `vtnet0` / `igb1`, rules as a UUID (your own rules) or a 32-character hash (OPNsense's built-in rules). Drop either or both of these along with the logs, or on their own later, to see names instead:
+
+- **Config backup**, from System → Configuration → Backups → Download. Gives interface names (LAN, WAN1, ...) and your own rules' descriptions, shown as `LAN: Default allow LAN to any rule`. pfSense backups work too; there, rules are matched by their tracker number.
+- **Rule ID list**, for the built-in rules (default deny, bogons, anti-lockout ...). While logged in to the web UI, open `https://<firewall>/api/diagnostics/firewall/list_rule_ids` and save it as `rule_ids.json`. This is the list OPNsense's own Live View uses. `/tmp/rules.debug` from the firewall works as well.
+
+Only the names are kept, in the browser's local storage, so you only load them once. The rest of `config.xml`, including password hashes, keys and certificates, is never stored, and **Forget names** clears them. `.gitignore` keeps `*.xml`, `*.json` and `*.debug` files out of the repo, so a backup can't be committed by accident.
+
+Once names are loaded, filters match them too: `in:lan`, `rule:dshield`.
 
 ## Windows Firewall
 

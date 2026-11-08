@@ -246,7 +246,12 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <ul>
           <li>Each rule logs only if its <b>Log</b> box is ticked (Firewall → Rules → edit the rule).</li>
           <li>The built-in default block and pass rules have their own logging switches under Firewall → Settings.</li>
-          <li>Rules show up by ID. Match an ID to its rule under Firewall → Rules, or load Live View API JSON to get rule descriptions and interface names (WAN, LAN).</li>
+          <li>Rules and interfaces show up as IDs (<code>vtnet0</code>, <code>rule 439d8dff…</code>). To see names, drop these along with the logs:
+            <ul>
+              <li>a config backup (System → Configuration → Backups → Download): your own rules, plus interface names like LAN and WAN</li>
+              <li>for built-in rules (default deny, bogons ...): open <code>https://&lt;firewall&gt;/api/diagnostics/firewall/list_rule_ids</code> while logged in and save the page as <code>rule_ids.json</code></li>
+            </ul>
+            Only the names are kept, in this browser. The rest of the backup, including its passwords and keys, isn't stored.</li>
         </ul>
         <h3>Windows Firewall</h3>
         <ul>
@@ -338,6 +343,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <div class="pager"><button id="pgNew">◀ Newer</button><button id="pgOld">Older ▶</button><span id="pgText"></span><span class="grow"></span><label class="tog"><input type="checkbox" id="oldestFirst"> Oldest first</label></div>
     </div>
     <div class="foot" id="foot"></div>
+    <div class="foot geo-attr" id="namesStatus"></div>
   </main>
 </div>
 
@@ -857,8 +863,13 @@ async function readFile(file, idx, total) {
 
 async function loadFiles(files) {
   files = [...files];
-  const geo = files.filter(isGeoFile), logs = files.filter(f => !isGeoFile(f));
+  const ruleIds = new Set();
+  for (const f of files) if (!isGeoFile(f) && await looksLikeRuleIds(f)) ruleIds.add(f);
+  const isNames = f => !isGeoFile(f) && (isNamesFile(f) || ruleIds.has(f));
+  const geo = files.filter(isGeoFile), nameFiles = files.filter(isNames), logs = files.filter(f => !isGeoFile(f) && !isNames(f));
   for (const f of geo) { try { await loadGeoFile(f); } catch (e) { alert(`Could not load ${f.name}: ${e.message}`); } }
+  for (const f of nameFiles) { try { await loadNamesFile(f); } catch (e) { alert(`Could not read names from ${f.name}: ${e.message}`); } }
+  namesStatus();
   if (!logs.length) {
     $('#progress').style.display = 'none';
     geoStatus();
@@ -1008,11 +1019,11 @@ function compileQuery(q) {
       case 'len': { const f = numMatcher(v); p = i => f(c.len[i]); break; }
       case 'proto': { const T = table(D.proto, strMatcher(v)); p = i => T[c.proto[i]]; break; }
       case 'in': case 'out': case 'iface': {
-        const T = table(D.iface, strMatcher(v));
+        const m = strMatcher(v.replace(/_/g, ' ')); const T = table(D.iface, s => m(s) || (!!ifLabel(s) && m(ifLabel(s))));
         p = k === 'in' ? i => T[c.iin[i]] : k === 'out' ? i => T[c.iout[i]] : i => T[c.iin[i]] || T[c.iout[i]];
         break;
       }
-      case 'rule': { const m = strMatcher(v), l = v.toLowerCase(); const T = Uint8Array.from(D.rule.list, s => s && (m(s) || s.toLowerCase().startsWith(l)) ? 1 : 0); p = i => T[c.rule[i]]; break; }
+      case 'rule': { const m = strMatcher(v), l = v.toLowerCase(), words = l.replace(/_/g, ' '); const T = Uint8Array.from(D.rule.list, s => s && (m(s) || s.toLowerCase().startsWith(l) || (ruleLabel(s) || '').toLowerCase().includes(words)) ? 1 : 0); p = i => T[c.rule[i]]; break; }
       case 'host': { const T = table(D.host, strMatcher(v)); p = i => T[c.host[i]]; break; }
       case 'mac': { const T = table(D.mac, strMatcher(v)); p = i => T[c.mac[i]]; break; }
       case 'act': case 'action': { const m = strMatcher(v.replace(/_/g, ' ')); const T = Uint8Array.from(D.act.list, (s, id) => m(s) || m(GROUPS[D.actGroup[id]].name) ? 1 : 0); p = i => T[c.act[i]]; break; }
@@ -1155,7 +1166,7 @@ const groupRows = (counts, total) => {
 /* ============================================================ render: tiles */
 function renderAll() {
   hideTip(); syncPresets();
-  renderTiles(); renderTimeline(); renderMap(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
+  namesStatus(); renderTiles(); renderTimeline(); renderMap(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
   const f = D.files.map(f => `${f.name} (${fmtN(f.events)}${f.partial ? ', stopped partway' : ''})`).join(', ');
   $('#foot').textContent = `${fmtN(D.n)} events from ${D.files.length} source${D.files.length > 1 ? 's' : ''}: ${f}.` +
     (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') +
@@ -1301,9 +1312,98 @@ function fmtTick(t, bin, span) { const d = new Date(t), day = `${MONS[d.getMonth
 })();
 let rsz; addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => { if (D && D.n && !$('#dash').hidden) renderTimeline(); }, 150); });
 
+/* ============================================================ rule & interface names (OPNsense / pfSense) */
+// Read from a config.xml backup and/or /tmp/rules.debug. Only names are kept (in this browser's
+// localStorage); the rest of config.xml, including its secrets, is never stored.
+const NAMES = { rules: {}, ifaces: {}, sources: [] };
+try { Object.assign(NAMES, JSON.parse(localStorage.getItem('fwscope-names') || '{}')); } catch {}
+const saveNames = () => { try { localStorage.setItem('fwscope-names', JSON.stringify(NAMES)); } catch {} };
+const isNamesFile = f => /\.(xml|debug)$/i.test(f.name) || /rules\.debug/i.test(f.name);
+const DEMO_NAMES = { rules: { '02f4bab031b57d1e30553ce08e0ec131': 'Default deny / state violation rule', 'fae559338f65e11c53669fc3642c93c2': 'let out anything from firewall host itself', '6a1f0d3c7e2b4a5d9c8e7f6a5b4c3d2e': 'Block bogon IPv6 networks from WAN', '#9': 'LAN: reject outbound SMTP' }, ifaces: { igb0: 'WAN', igb1: 'LAN' } };
+const names = () => Object.keys(NAMES.rules).length || Object.keys(NAMES.ifaces).length || !(D && D.demoGeo) ? NAMES : DEMO_NAMES;
+const ruleLabel = s => names().rules[s] || names().rules[s.replace(/^#/, '')];
+const ifLabel = dev => dev && names().ifaces[dev];
+// OPNsense logs a rule as a 32-hex or UUID id; shorten it when there's no name for it
+const ruleName = s => ruleLabel(s) || (/^[0-9a-f]{32}$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) ? 'rule ' + s.slice(0, 8) + '…' : s.replace(/_/g, ' '));
+const ifName = dev => ifLabel(dev) ? `${ifLabel(dev)} (${dev})` : dev;
+
+function readConfigXml(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('not valid XML');
+  const top = doc.documentElement.nodeName.toLowerCase();
+  if (top !== 'opnsense' && top !== 'pfsense') throw new Error('not an OPNsense or pfSense config.xml');
+  const kid = (el, name) => { for (const c of el.children) if (c.nodeName === name) return c.textContent.trim(); return ''; };
+  const ifKey = {}; let nIf = 0, nRules = 0;
+  const ifs = [...doc.documentElement.children].find(c => c.nodeName === 'interfaces');
+  for (const el of ifs ? ifs.children : []) {
+    const dev = kid(el, 'if'), label = kid(el, 'descr') || el.nodeName.toUpperCase();
+    ifKey[el.nodeName] = label;
+    if (dev) { NAMES.ifaces[dev] = label; nIf++; }
+  }
+  // WireGuard / OpenVPN etc. that aren't assigned still have a device name in their own sections
+  for (const el of doc.getElementsByTagName('server')) { const dev = kid(el, 'interface') || ''; const label = kid(el, 'name') || kid(el, 'description'); if (/^(wg|ovpn)/.test(dev) && label && !NAMES.ifaces[dev]) { NAMES.ifaces[dev] = label; nIf++; } }
+  // filter rules: legacy <filter><rule uuid=..> and the newer MVC rules (<rule uuid=..> with <description>);
+  // pfSense logs <tracker> instead of a uuid
+  for (const el of doc.getElementsByTagName('rule')) {
+    const id = el.getAttribute('uuid'), tracker = kid(el, 'tracker');
+    if (!id && !tracker) continue;
+    const descr = kid(el, 'descr') || kid(el, 'description');
+    const iface = (kid(el, 'interface') || '').split(',').filter(Boolean).map(k => ifKey[k] || k.toUpperCase()).join(', ');
+    const type = kid(el, 'type') || kid(el, 'action') || 'pass';
+    const label = descr ? (iface ? `${iface}: ${descr}` : descr) : `${type}${iface ? ' on ' + iface : ''} (no description)`;
+    if (id) NAMES.rules[id.toLowerCase()] = label;
+    if (tracker) NAMES.rules[tracker] = label;
+    nRules++;
+  }
+  return { nIf, nRules };
+}
+// /tmp/rules.debug: every generated pf rule, with label "<id>" and usually a "# description" comment.
+// This is where the built-in rules (default deny, anti-lockout, bogons ...) get their names.
+function readRulesDebug(text) {
+  let n = 0;
+  for (const line of text.split('\n')) {
+    const m = /label\s+"([^"]+)"/.exec(line);
+    if (!m) continue;
+    const id = m[1].toLowerCase();
+    let d = (/#\s*(.+?)\s*$/.exec(line.slice(m.index)) || [])[1];
+    if (!d) d = line.slice(0, m.index).replace(/\s+/g, ' ').trim().slice(0, 70);
+    if (!NAMES.rules[id] || / \(no description\)$/.test(NAMES.rules[id])) { NAMES.rules[id] = d; n++; }
+  }
+  return { nRules: n, nIf: 0 };
+}
+// OPNsense API /api/diagnostics/firewall/list_rule_ids: {"items":[{"id":"<label>","descr":"..."}]}, built-in rules included
+function readRuleIdsJson(text) {
+  let o; try { o = JSON.parse(text); } catch { throw new Error('not valid JSON'); }
+  const items = Array.isArray(o) ? o : o && o.items;
+  if (!Array.isArray(items)) throw new Error('expected {"items": [...]} from list_rule_ids');
+  let n = 0;
+  for (const it of items) {
+    if (!it || !it.id || !it.descr || /^-- /.test(it.descr)) continue;
+    const id = String(it.id).toLowerCase();
+    if (!NAMES.rules[id] || / \(no description\)$/.test(NAMES.rules[id])) NAMES.rules[id] = it.descr;
+    n++;
+  }
+  return { nRules: n, nIf: 0 };
+}
+// .json is ambiguous (logs can be JSON too), so peek at the start of the file
+async function looksLikeRuleIds(f) { return /\.json$/i.test(f.name) && /"items"\s*:\s*\[\s*(\{\s*"(id|descr)"|\])/.test(await f.slice(0, 300).text()); }
+async function loadNamesFile(file) {
+  const text = await file.text();
+  const r = /^\s*</.test(text) ? readConfigXml(text) : /^\s*[{[]/.test(text) ? readRuleIdsJson(text) : readRulesDebug(text);
+  if (!r.nRules && !r.nIf) throw new Error('no rules or interfaces found in it');
+  NAMES.sources = NAMES.sources.filter(s => s.name !== file.name).concat({ name: file.name, rules: r.nRules, ifaces: r.nIf });
+  saveNames();
+}
+function namesStatus() {
+  const box = $('#namesStatus'); box.textContent = '';
+  if (!NAMES.sources.length) return;
+  box.append(`Rule and interface names from ${NAMES.sources.map(s => `${s.name} (${fmtN(s.rules)} rules, ${fmtN(s.ifaces)} interfaces)`).join(', ')}. `);
+  const b = el('button', null, 'Forget names');
+  b.onclick = () => { NAMES.rules = {}; NAMES.ifaces = {}; NAMES.sources = []; saveNames(); if (D && D.n) setQuery($('#q').value); else namesStatus(); };
+  box.append(b);
+}
+
 /* ============================================================ render: ranked lists */
-// OPNsense logs a rule as a 32-hex id; shorten it for display (the full id is in the filter token)
-const ruleName = s => /^[0-9a-f]{32}$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s) ? 'rule ' + s.slice(0, 8) + '…' : s.replace(/_/g, ' ');
 function subnetOf(ip) {
   if (ip.includes(':')) { const b = ipBits(ip); if (!b) return ip; const g = []; for (let i = 0; i < 4; i++) g.push(parseInt(b.slice(i * 16, i * 16 + 16), 2).toString(16)); return g.join(':') + '::/64'; }
   const p = ip.split('.'); return p.length === 4 ? `${p[0]}.${p[1]}.${p[2]}.0/24` : ip;
@@ -1317,13 +1417,13 @@ const DIMS = {
   dpt:   { label: 'Destination ports', key: i => D.c.dpt[i], name: k => String(k), sub: k => svcName(k), tok: k => 'dpt:' + k, skip: k => k < 0 },
   spt:   { label: 'Source ports', key: i => D.c.spt[i], name: k => String(k), sub: k => svcName(k), tok: k => 'spt:' + k, skip: k => k < 0 },
   proto: { label: 'Protocols', key: i => D.c.proto[i], name: k => D.proto.list[k], tok: k => 'proto:' + D.proto.list[k] },
-  iin:   { label: 'Inbound interfaces', key: i => D.c.iin[i], name: k => D.iface.list[k] || '(none: outbound)', tok: k => D.iface.list[k] ? 'in:' + D.iface.list[k] : null },
-  iout:  { label: 'Outbound interfaces', key: i => D.c.iout[i], name: k => D.iface.list[k] || '(none: inbound)', tok: k => D.iface.list[k] ? 'out:' + D.iface.list[k] : null },
+  iin:   { label: 'Inbound interfaces', key: i => D.c.iin[i], name: k => ifLabel(D.iface.list[k]) || D.iface.list[k] || '(none: outbound)', sub: k => ifLabel(D.iface.list[k]) ? D.iface.list[k] : '', tok: k => D.iface.list[k] ? 'in:' + D.iface.list[k] : null },
+  iout:  { label: 'Outbound interfaces', key: i => D.c.iout[i], name: k => ifLabel(D.iface.list[k]) || D.iface.list[k] || '(none: inbound)', sub: k => ifLabel(D.iface.list[k]) ? D.iface.list[k] : '', tok: k => D.iface.list[k] ? 'out:' + D.iface.list[k] : null },
   icmp:  { label: 'ICMP types', key: i => { const p = D.proto.list[D.c.proto[i]]; return p.startsWith('ICMP') ? (p === 'ICMPv6' ? 1000 : 0) + D.c.itype[i] : -1; },
            name: k => (k >= 1000 ? 'v6 ' : 'v4 ') + (k % 1000), sub: k => icmpName(k >= 1000 ? 'ICMPv6' : 'ICMP', k % 1000), tok: k => 'type:' + (k % 1000), skip: k => k < 0 },
   mac:   { label: 'Source MACs', key: i => D.c.mac[i], name: k => D.mac.list[k] || '(none)', tok: k => D.mac.list[k] ? 'mac:' + D.mac.list[k] : null },
   host:  { label: 'Logging hosts', key: i => D.c.host[i], name: k => D.host.list[k] || '(unknown)', tok: k => D.host.list[k] ? 'host:' + D.host.list[k] : null },
-  rule:  { label: 'Firewall rules (OPNsense)', key: i => D.c.rule[i], name: k => ruleName(D.rule.list[k]), tok: k => 'rule:' + D.rule.list[k], skip: k => k === 0 },
+  rule:  { label: 'Firewall rules (OPNsense)', key: i => D.c.rule[i], name: k => ruleName(D.rule.list[k]), sub: k => ruleLabel(D.rule.list[k]) ? D.rule.list[k].slice(0, 8) : '', tok: k => 'rule:' + D.rule.list[k], skip: k => k === 0 },
   act:   { label: 'Actions (exact tag)', key: i => D.c.act[i], name: k => D.act.list[k], tok: k => 'act:' + D.act.list[k].replace(/ /g, '_') },
 };
 function subnetId(ipId) {
@@ -1520,7 +1620,8 @@ function renderEvents() {
     const ad = el('td'); const sp = el('span', 'act'); const key = el('i', 'key'); key.style.background = `var(${GROUPS[g].css})`; sp.append(key, document.createTextNode(D.act.list[c.act[i]])); ad.append(sp); tr.append(ad);
     if (multiHost) td(D.host.list[c.host[i]], null, D.host.list[c.host[i]] ? 'host:' + D.host.list[c.host[i]] : null);
     const iin = D.iface.list[c.iin[i]], iout = D.iface.list[c.iout[i]];
-    td(iin, 'mono', iin ? 'in:' + iin : null); td(iout, 'mono', iout ? 'out:' + iout : null);
+    const ifTd = (dev, dir) => { const d = td(ifLabel(dev) || dev, ifLabel(dev) ? null : 'mono', dev ? dir + ':' + dev : null); if (ifLabel(dev)) d.title = dev; };
+    ifTd(iin, 'in'); ifTd(iout, 'out');
     const proto = D.proto.list[c.proto[i]];
     td(proto, null, 'proto:' + proto);
     const src = D.ip.list[c.src[i]], dst = D.ip.list[c.dst[i]];

@@ -11,3 +11,9 @@ logs/
 *.mmdb.gz
 
 .claude/
+
+# firewall configs and rule dumps hold secrets (password hashes, VPN keys, certs)
+*.xml
+*.xml.*
+rules.debug
+*.debug
