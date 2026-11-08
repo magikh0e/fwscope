@@ -103,6 +103,28 @@ The map outline is Natural Earth 1:110m (public domain), projected (Equal Earth)
 
 The header emblem and favicon are drawn from that same map by `tools/build-logo.mjs`, which also writes `assets/logo.svg` and `assets/favicon.svg`. Run it after `build-map.mjs`. `assets/fwscope-badge.webp` is the full badge with lettering.
 
+## Big logs
+
+A busy firewall writes a lot: one real OPNsense box here logs about 850K events (200 MB) a day. The page handles that in a few ways:
+
+- **Load options**, under the header, apply to files you load next. Skipped events never take up memory:
+  - **Skip LAN chatter** drops multicast, broadcast, IGMP and IPv6 neighbor discovery.
+  - **Blocks only** drops ALLOW / PASS events, usually the bulk of a router's log.
+- **Progress** shows events kept, events skipped and memory used. **Stop** ends the load and keeps everything read so far.
+- **Files load oldest first**, by name, so stopping early leaves a continuous stretch of time.
+- **Safety cap:** loading stops cleanly at 20 million events, about what a browser tab can hold, and tells you what to change.
+- **Low-memory duplicate check:** overlapping files (like OPNsense's `latest.log` and that day's `filter_*.log`) are still de-duplicated, without keeping a large lookup table for every event.
+
+Measured on that firewall, in Chrome:
+
+| Loaded | Events kept | Load time | Memory | Filter |
+|---|---|---|---|---|
+| 1 day | 835K | 2.5 s | ~150 MB | 27 ms |
+| 7 days + `latest.log` | 5.7M (694K duplicates skipped) | 16 s | ~670 MB | 71 ms |
+| 31 days, both load options on | 3.0M of 26M | about a minute | ~250 MB | 51 ms |
+
+For more than a week of a busy firewall, turn on the load options, or load a week at a time.
+
 ## Filter syntax
 
 The filter box takes space-separated terms. All of them must match.
@@ -128,7 +150,7 @@ The filter bar also has time presets (relative to the newest event in the logs, 
 ## Notes
 
 - Classic syslog timestamps have no year or timezone. The year is inferred from the file's modified date, and the time is read as your browser's local time. ISO and journal timestamps carry their offset and are converted to your local time.
-- Tested to about 550K events (137 MB) in a few seconds. Data is stored in columns of typed arrays, so filtering stays fast.
+- Data is stored in columns of typed arrays (about 55 bytes per event), so filtering stays fast even with millions of events.
 - **Sample data** generates a fake week of logs using the documentation IP ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32), so no real addresses are implicated.
 
 ## License

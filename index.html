@@ -79,6 +79,9 @@ header.top h1 span { color: var(--muted); font-weight: 400; }
 
 /* progress */
 #progress { display: none; margin: 10px 0; color: var(--ink-2); font-size: 13px; }
+#progress button { font-size: 12px; padding: 1px 8px; margin-left: 6px; }
+.loadopts { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; color: var(--muted); font-size: 12.5px; margin: -6px 0 10px; }
+.loadopts .muted { color: var(--muted); }
 #progress .bar { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; margin-top: 6px; }
 #progress .bar div { height: 100%; width: 0; background: var(--accent); transition: width .1s; }
 
@@ -188,7 +191,12 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
     <button id="btnTheme" title="Toggle light/dark">◐</button>
   </header>
 
-  <div id="progress"><span id="progText">Reading…</span><div class="bar"><div id="progBar"></div></div></div>
+  <div class="loadopts" title="These apply to files you load next. Skipped events never take up memory, so more days fit.">
+    <span>When loading:</span>
+    <label class="tog"><input type="checkbox" id="optChatter"> Skip LAN chatter <span class="muted">(multicast, broadcast, IPv6 neighbor discovery)</span></label>
+    <label class="tog"><input type="checkbox" id="optBlocks"> Blocks only <span class="muted">(skip ALLOW / PASS)</span></label>
+  </div>
+  <div id="progress"><span id="progText">Reading…</span> <button id="btnStop" title="Stop reading and keep what's loaded so far">Stop</button><div class="bar"><div id="progBar"></div></div></div>
 
   <section id="empty">
     <div id="drop">
@@ -554,13 +562,27 @@ const COLS = { ts: Float64Array, act: Uint8Array, src: Uint32Array, dst: Uint32A
 let D;
 function resetStore() {
   D = { n: 0, cap: 0, c: {}, ip: new Intern(), proto: new Intern(), iface: new Intern(), host: new Intern(), mac: new Intern(), act: new Intern(), rule: new Intern(),
-        actGroup: [], files: [], dupes: 0, lines: 0, noTime: 0, seen: new Set(), order: null, ipc: null, minTs: NaN, maxTs: NaN };
+        actGroup: [], files: [], dupes: 0, skipped: 0, lines: 0, noTime: 0, prior: [], order: null, ipc: null, minTs: NaN, maxTs: NaN };
   D.iface.id(''); D.host.id(''); D.mac.id(''); D.ip.id(''); D.rule.id('');
   grow(1 << 14);
 }
+const ROW_BYTES = Object.values(COLS).reduce((s, T) => s + T.BYTES_PER_ELEMENT, 0);
+// A browser tab runs out of memory somewhere past this; stop loading cleanly instead.
+const MAX_EVENTS = 20e6;
 function grow(cap) {
   for (const [k, T] of Object.entries(COLS)) { const a = new T(cap); if (D.c[k]) a.set(D.c[k].subarray(0, D.n)); D.c[k] = a; }
   D.cap = cap;
+}
+const nextCap = cap => cap < 4194304 ? cap * 2 : Math.ceil(cap * 1.5);
+const memMB = () => Math.round((D.cap * ROW_BYTES + D.prior.reduce((s, p) => s + p.keys.byteLength, 0)) / 1e6);
+
+/* load-time skipping: rows dropped here never use memory (the view toggles only hide them) */
+const LOAD = { chatter: false, blocksOnly: false };
+try { Object.assign(LOAD, JSON.parse(localStorage.getItem('fwscope-load') || '{}')); } catch {}
+function isChatter(r) {
+  const d = r.dst || '', s = r.src || '';
+  return /^ff/i.test(d) || /^2(2[4-9]|3\d)\./.test(d) || d.endsWith('.255') || r.proto === 'IGMP' || /^fe[89ab]/i.test(s) ||
+    (r.proto === 'ICMPv6' && r.itype >= 133 && r.itype <= 137);
 }
 function actId(label) {
   const id = D.act.id(label);
@@ -653,13 +675,27 @@ function wfLine(line, ctx) {
   const [iin, iout] = WF_PATH[(o.path || '').toUpperCase()] || ['', ''];
   const n = x => x !== undefined && /^\d+$/.test(x) ? +x : undefined;
   addRow({ ts, host: wfHostName(ctx), act: o.action, proto, src: o['src-ip'], dst: o['dst-ip'], spt: n(o['src-port']), dpt: n(o['dst-port']),
-    iin, iout, len: n(o.size), flags: tcpFlags(o.tcpflags), itype: n(o.icmptype), icode: n(o.icmpcode) });
+    iin, iout, len: n(o.size), flags: tcpFlags(o.tcpflags), itype: n(o.icmptype), icode: n(o.icmpcode) }, ctx);
 }
-// duplicate check: same second + same packet description, seen in an earlier file
+// Duplicate check: same second + same packet description, seen in an earlier file (UFW writes
+// every line to ufw.log, kern.log and syslog; OPNsense's latest.log repeats today's file).
+// Each file keeps its keys as a compact Float64Array plus its time range; a lookup Set is only
+// built for an earlier file when a new line falls inside that file's time range.
 function isDup(ts, body, ctx) {
   const key = hash((ts / 1000 | 0) + body);
-  if (ctx.prevSeen.has(key)) { D.dupes++; return true; }
-  ctx.mySeen.push(key); return false;
+  ctx.pk = key;
+  for (const p of D.prior) {
+    if (ts === ts ? ts >= p.lo - 2000 && ts <= p.hi + 2000 : p.nan) {
+      if (!p.set) p.set = new Set(p.keys);
+      if (p.set.has(key)) { D.dupes++; return true; }
+    }
+  }
+  return false;
+}
+function keepKey(ctx, ts) {
+  if (ctx.kn >= ctx.keys.length) { const k = new Float64Array(ctx.keys.length * 2); k.set(ctx.keys); ctx.keys = k; }
+  ctx.keys[ctx.kn++] = ctx.pk;
+  if (ts === ts) { if (ts < ctx.lo) ctx.lo = ts; if (ts > ctx.hi) ctx.hi = ts; } else ctx.nan = true;
 }
 function handleJson(line, ctx) {
   let o; try { o = JSON.parse(line); } catch { return; }
@@ -680,8 +716,11 @@ function jsonArray(text, ctx) {
   if (!Array.isArray(a)) a = [a];
   for (const o of a) { if (typeof o === 'string') handleLine(o, ctx); else handleObj(o, ctx); }
 }
-function addRow(r) {
-  if (D.n >= D.cap) grow(D.cap * 2);
+function addRow(r, ctx) {
+  if ((LOAD.blocksOnly && /^(ALLOW|PASS)/i.test(r.act)) || (LOAD.chatter && isChatter(r))) { D.skipped++; return; }
+  keepKey(ctx, r.ts);
+  if (D.n >= MAX_EVENTS) { D.stop = D.capped = true; return; }
+  if (D.n >= D.cap) grow(nextCap(D.cap));
   const c = D.c, n = D.n++;
   c.ts[n] = r.ts; c.act[n] = actId(r.act);
   c.src[n] = D.ip.id(r.src || ''); c.dst[n] = D.ip.id(r.dst || '');
@@ -726,7 +765,7 @@ function filterlogCsv(csv, ts, host, ctx) {
   if (r.proto === 'TCP') { r.spt = +f[k]; r.dpt = +f[k + 1]; r.flags |= tcpFlags(f[k + 3]); }
   else if (r.proto === 'UDP') { r.spt = +f[k]; r.dpt = +f[k + 1]; }
   else if (r.proto === 'ICMP' || r.proto === 'ICMPv6') { const w = f[k]; if (w in ICMP_WORD) { r.itype = ICMP_WORD[w]; r.icode = ICMP_CODE[w] ?? 0; } }
-  addRow(r);
+  addRow(r, ctx);
 }
 function opnApiObj(o, ctx) {
   const ts = o.__timestamp__ ? Date.parse(o.__timestamp__) : o.timestamp ? Date.parse(o.timestamp) : NaN;
@@ -738,7 +777,7 @@ function opnApiObj(o, ctx) {
     flags: (o.ipflags === 'DF' ? FLAGS.DF : 0) | tcpFlags(o.tcpflags) };
   if (o.srcport) r.spt = +o.srcport; if (o.dstport) r.dpt = +o.dstport;
   if ((r.proto === 'ICMP' || r.proto === 'ICMPv6') && o.icmp_type in ICMP_WORD) r.itype = ICMP_WORD[o.icmp_type];
-  addRow(r);
+  addRow(r, ctx);
 }
 
 function ufwMsg(msg, ts, host, ctx) {
@@ -766,14 +805,22 @@ function ufwMsg(msg, ts, host, ctx) {
   const num = x => x !== undefined ? +x : undefined;
   addRow({ ts, host, act: label, proto, src: kv.SRC, dst: kv.DST, spt: num(kv.SPT), dpt: num(kv.DPT), iin: kv.IN, iout: kv.OUT,
     len: num(kv.LEN), ttl: num(kv.TTL ?? kv.HOPLIMIT), flags, itype: num(kv.TYPE), icode: num(kv.CODE),
-    mac: kv.MAC && kv.MAC.length >= 35 ? kv.MAC.slice(18, 35) : '' });
+    mac: kv.MAC && kv.MAC.length >= 35 ? kv.MAC.slice(18, 35) : '' }, ctx);
 }
 
-function newCtx(ref) { const r = ref || Date.now(); return { ref: r, year: new Date(r).getFullYear(), prevSeen: D.seen, mySeen: [] }; }
-function closeCtx(ctx) { for (const k of ctx.mySeen) D.seen.add(k); }
+function newCtx(ref) { const r = ref || Date.now(); return { ref: r, year: new Date(r).getFullYear(), keys: new Float64Array(4096), kn: 0, lo: Infinity, hi: -Infinity, nan: false, pk: 0, skipped0: D.skipped }; }
+function closeCtx(ctx) { if (ctx.kn) D.prior.push({ keys: ctx.keys.slice(0, ctx.kn), lo: ctx.lo, hi: ctx.hi, nan: ctx.nan, set: null }); }
 
 const tick = () => new Promise(r => setTimeout(r, 0));
-function progress(text, frac) { $('#progress').style.display = 'block'; $('#progText').textContent = text; $('#progBar').style.width = (frac == null ? 100 : Math.round(frac * 100)) + '%'; }
+function progress(text, frac) {
+  $('#progress').style.display = 'block'; $('#progBar').style.width = (frac == null ? 100 : Math.round(frac * 100)) + '%';
+  $('#progText').textContent = text + (D ? ` · ${fmtN(D.n)} events` + (D.skipped ? `, ${fmtN(D.skipped)} skipped` : '') + ` · ~${fmtN(memMB())} MB` : '');
+}
+$('#btnStop').onclick = () => { if (D) D.stop = true; };
+for (const [id, k] of [['#optChatter', 'chatter'], ['#optBlocks', 'blocksOnly']]) {
+  $(id).checked = !!LOAD[k];
+  $(id).onchange = e => { LOAD[k] = e.target.checked; try { localStorage.setItem('fwscope-load', JSON.stringify(LOAD)); } catch {} };
+}
 
 async function readFile(file, idx, total) {
   const ctx = newCtx(file.lastModified); ctx.name = file.name;
@@ -781,7 +828,7 @@ async function readFile(file, idx, total) {
   const gz = head[0] === 0x1f && head[1] === 0x8b;
   if (!gz && /^\s*\[/.test(await file.slice(0, 64).text())) { // a JSON array, e.g. saved from the OPNsense API
     const before = D.n; jsonArray(await file.text(), ctx); closeCtx(ctx);
-    D.files.push({ name: file.name, events: D.n - before }); return;
+    D.files.push({ name: file.name, events: D.n - before, skipped: D.skipped - ctx.skipped0 }); return;
   }
   let stream = file.stream();
   let read = 0;
@@ -797,14 +844,15 @@ async function readFile(file, idx, total) {
     const parts = (rem + value).split('\n');
     rem = parts.pop();
     for (const p of parts) handleLine(p, ctx);
+    if (D.stop) { rem = ''; reader.cancel().catch(() => {}); break; }
     if (performance.now() - last > 60) {
-      progress(`Reading ${file.name} (${idx + 1}/${total}): ${fmtN(D.n)} events`, file.size ? read / file.size : null);
+      progress(`Reading ${file.name} (${idx + 1}/${total})`, file.size ? read / file.size : null);
       await tick(); last = performance.now();
     }
   }
   if (rem) handleLine(rem, ctx);
   closeCtx(ctx);
-  D.files.push({ name: file.name, events: D.n - before, gz });
+  D.files.push({ name: file.name, events: D.n - before, skipped: D.skipped - ctx.skipped0, gz, partial: !!D.stop });
 }
 
 async function loadFiles(files) {
@@ -818,20 +866,27 @@ async function loadFiles(files) {
     return;
   }
   if (!D || D.demoGeo) resetStore(); // real logs replace the sample instead of mixing with it
+  D.stop = false;
+  // oldest first, so a Stop or the size cap keeps a continuous early stretch rather than gaps
+  logs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  let done = 0;
   try {
-    for (let i = 0; i < logs.length; i++) await readFile(logs[i], i, logs.length);
+    for (; done < logs.length && !D.stop; done++) await readFile(logs[done], done, logs.length);
   } catch (e) { alert('Could not read file: ' + e.message); }
+  const skippedFiles = logs.length - done;
   finish();
+  if (D && D.capped) alert(`Stopped at ${fmtN(MAX_EVENTS)} events, about as much as a browser tab can hold. ${skippedFiles ? fmtN(skippedFiles) + ' file(s) were not read. ' : ''}To fit more, turn on "skip LAN chatter" or "blocks only" under the header and load fewer days at a time.`);
 }
 async function loadText(name, text, ref) {
   if (!D) resetStore();
+  D.stop = false;
   progress('Parsing ' + name + '…', null); await tick();
   const ctx = newCtx(ref); ctx.name = name;
   const before = D.n;
   const lines = /^\s*\[/.test(text) ? (jsonArray(text, ctx), []) : text.split('\n');
-  for (let i = 0; i < lines.length; i++) { handleLine(lines[i], ctx); if ((i & 32767) === 32767) { progress(`Parsing ${name}: ${fmtN(D.n)} events`, i / lines.length); await tick(); } }
+  for (let i = 0; i < lines.length && !D.stop; i++) { handleLine(lines[i], ctx); if ((i & 32767) === 32767) { progress(`Parsing ${name}`, i / lines.length); await tick(); } }
   closeCtx(ctx);
-  D.files.push({ name, events: D.n - before });
+  D.files.push({ name, events: D.n - before, skipped: D.skipped - ctx.skipped0, partial: !!D.stop });
   finish();
 }
 
@@ -856,10 +911,15 @@ function finish() {
     if (D && !D.n) D = null;
     return;
   }
+  for (const p of D.prior) p.set = null; // lookup sets are only needed while loading
+  if (D.cap > D.n + 65536) grow(D.n);   // give back the growth headroom
   const n = D.n, ts = D.c.ts;
   const order = new Uint32Array(n);
   for (let i = 0; i < n; i++) order[i] = i;
-  order.sort((a, b) => { const x = ts[a], y = ts[b]; return x === y ? a - b : x !== x ? 1 : y !== y ? -1 : x - y; });
+  // logs are usually already in time order (files are read oldest first); only sort when they aren't
+  let sorted = true;
+  for (let i = 1; i < n; i++) if (!(ts[i] >= ts[i - 1])) { sorted = false; break; }
+  if (!sorted) order.sort((a, b) => { const x = ts[a], y = ts[b]; return x === y ? a - b : x !== x ? 1 : y !== y ? -1 : x - y; });
   D.order = order;
   D.ipc = Uint8Array.from(D.ip.list, ipClass);
   geoIndex();
@@ -1096,9 +1156,10 @@ const groupRows = (counts, total) => {
 function renderAll() {
   hideTip(); syncPresets();
   renderTiles(); renderTimeline(); renderMap(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderEvents();
-  const f = D.files.map(f => `${f.name} (${fmtN(f.events)})`).join(', ');
+  const f = D.files.map(f => `${f.name} (${fmtN(f.events)}${f.partial ? ', stopped partway' : ''})`).join(', ');
   $('#foot').textContent = `${fmtN(D.n)} events from ${D.files.length} source${D.files.length > 1 ? 's' : ''}: ${f}.` +
-    (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') + (D.noTime ? ` ${fmtN(D.noTime)} events have no timestamp (plain dmesg) and are left out of time charts.` : '') +
+    (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') +
+    (D.skipped ? ` ${fmtN(D.skipped)} events skipped while loading (load options).` : '') + ` About ${fmtN(memMB())} MB in memory.` + (D.noTime ? ` ${fmtN(D.noTime)} events have no timestamp (plain dmesg) and are left out of time charts.` : '') +
     ` Times shown in your browser's timezone.`;
 }
 function renderTiles() {
