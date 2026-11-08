@@ -11,6 +11,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>fwscope</title>
+<meta name="version" content="1.0.0">
 <!--FAVICON--><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2218%22%20fill%3D%22%231a1a19%22%2F%3E%3Cpath%20fill%3D%22%233987e5%22%20d%3D%22M37.92%2025.65a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M41.82%2025.65a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M61.32%2025.65a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M65.22%2025.65a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M69.12%2025.65a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M30.12%2029.55a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M34.02%2029.55a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M37.92%2029.55a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M49.62%2029.55a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M53.52%2029.55a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M57.42%2029.55a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M61.32%2029.55a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M65.22%2029.55a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M69.12%2029.55a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M26.22%2033.45a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M30.12%2033.45a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M49.62%2033.45a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M57.42%2033.45a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M61.32%2033.45a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M65.22%2033.45a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M69.12%2033.45a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M30.12%2037.35a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M34.02%2037.35a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M45.72%2037.35a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M49.62%2037.35a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M53.52%2037.35a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M57.42%2037.35a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M65.22%2037.35a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M69.12%2037.35a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M34.02%2041.25a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M53.52%2041.25a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M57.42%2041.25a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M34.02%2045.15a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M37.92%2045.15a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M53.52%2045.15a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M37.92%2049.05a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M53.52%2049.05a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M73.02%2049.05a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M76.92%2049.05a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200M76.92%2052.95a1.33%201.33%200%201%200%202.65%200a1.33%201.33%200%201%200%20-2.65%200%22%2F%3E%3Cpath%20fill%3D%22%236b7a85%22%20d%3D%22M17.9%2065h9.7v5h-9.7zM29.2%2065h10v5h-10zM40.8%2065h10v5h-10zM52.4%2065h10v5h-10zM64%2065h10v5h-10zM75.6%2065h6.5v5h-6.5zM23.4%2071.6h10v5h-10zM35%2071.6h10v5h-10zM46.6%2071.6h10v5h-10zM58.2%2071.6h10v5h-10zM69.8%2071.6h7.23v5h-7.23zM31.31%2078.2h7.89v5h-7.89zM40.8%2078.2h10v5h-10zM52.4%2078.2h10v5h-10zM64%2078.2h4.69v5h-4.69z%22%2F%3E%3Cpath%20stroke%3D%22%236b7a85%22%20stroke-width%3D%220.9%22%20fill%3D%22none%22%20d%3D%22M24%2050H76M50%2024V76M29%2048.4v3.2M48.4%2029h3.2M36%2048.4v3.2M48.4%2036h3.2M43%2048.4v3.2M48.4%2043h3.2M57%2048.4v3.2M48.4%2057h3.2M64%2048.4v3.2M48.4%2064h3.2M71%2048.4v3.2M48.4%2071h3.2%22%2F%3E%3Cpath%20stroke%3D%22%236b7a85%22%20stroke-width%3D%224.2%22%20stroke-linecap%3D%22butt%22%20fill%3D%22none%22%20d%3D%22M50%208V24M50%2076V92M8%2050H24M76%2050H92%22%2F%3E%3Ccircle%20cx%3D%2236.22%22%20cy%3D%2231.88%22%20r%3D%224.68%22%20fill%3D%22%23d55181%22%20opacity%3D%220.3%22%2F%3E%3Ccircle%20cx%3D%2236.22%22%20cy%3D%2231.88%22%20r%3D%222.6%22%20fill%3D%22%23d55181%22%2F%3E%3Ccircle%20cx%3D%2251.52%22%20cy%3D%2229.71%22%20r%3D%224.68%22%20fill%3D%22%23d55181%22%20opacity%3D%220.3%22%2F%3E%3Ccircle%20cx%3D%2251.52%22%20cy%3D%2229.71%22%20r%3D%222.6%22%20fill%3D%22%23d55181%22%2F%3E%3Ccircle%20cx%3D%2271.78%22%20cy%3D%2232.05%22%20r%3D%224.68%22%20fill%3D%22%23d55181%22%20opacity%3D%220.3%22%2F%3E%3Ccircle%20cx%3D%2271.78%22%20cy%3D%2232.05%22%20r%3D%222.6%22%20fill%3D%22%23d55181%22%2F%3E%3Ccircle%20cx%3D%2240.55%22%20cy%3D%2249.51%22%20r%3D%224.68%22%20fill%3D%22%23d55181%22%20opacity%3D%220.3%22%2F%3E%3Ccircle%20cx%3D%2240.55%22%20cy%3D%2249.51%22%20r%3D%222.6%22%20fill%3D%22%23d55181%22%2F%3E%3Ccircle%20cx%3D%2271.91%22%20cy%3D%2242.54%22%20r%3D%224.68%22%20fill%3D%22%23d55181%22%20opacity%3D%220.3%22%2F%3E%3Ccircle%20cx%3D%2271.91%22%20cy%3D%2242.54%22%20r%3D%222.6%22%20fill%3D%22%23d55181%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2242%22%20fill%3D%22none%22%20stroke%3D%22%236b7a85%22%20stroke-width%3D%225%22%2F%3E%3Cpath%20d%3D%22M50%208A42%2042%200%200%201%2050%2092%22%20fill%3D%22none%22%20stroke%3D%22%23b7d3f6%22%20stroke-width%3D%225%22%2F%3E%3C%2Fsvg%3E"><!--END-FAVICON-->
 <style>
 :root {
@@ -261,7 +262,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
   <section id="empty">
     <div id="drop">
       <h2 style="margin:0 0 6px">Drop firewall or WAF logs here</h2>
-      <p>Firewalls: UFW / iptables, OPNsense / pfSense, Windows Firewall. Web application firewalls: ModSecurity and Coraza.</p>
+      <p>Firewalls: UFW, nftables / iptables / firewalld, OPNsense / pfSense, Windows Firewall, plus fail2ban's log. Web application firewalls: ModSecurity, Coraza and Cloudflare firewall events.</p>
       <p>Windows: <code>pfirewall.log</code> (copy it out from an admin prompt first).</p>
       <p>ModSecurity: the audit log (<code>modsec_audit.log</code>, JSON or native format) or the <code>ModSecurity:</code> lines in an Apache or nginx error log.</p>
       <p>OPNsense / pfSense: <code>/var/log/filter/filter_*.log</code>, remote-syslog copies, or Live View API JSON.</p>
@@ -269,7 +270,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <p>Drop several at once to merge them. Duplicates across files are skipped (UFW writes the same line to ufw.log, kern.log and syslog).</p>
       <p>For a world map and network owners, drop a GeoIP database too (<code>.mmdb</code> or <code>.mmdb.gz</code>). <span id="geoStatusEmpty"></span></p>
       <p>OPNsense / pfSense: drop a config backup (<code>config-*.xml</code>) and/or <code>rule_ids.json</code> to show interface and rule names. <span id="namesStatusEmpty"></span></p>
-      <p style="color:var(--muted)">Everything is parsed in this browser tab. Nothing is uploaded anywhere, unless you turn on the optional hostname lookups.</p>
+      <p style="color:var(--muted)">Everything is parsed in this browser tab. Nothing is uploaded anywhere, unless you turn on the optional hostname lookups. <a href="https://github.com/magikh0e/fwscope" target="_blank" rel="noopener">fwscope 1.0.0</a></p>
     </div>
     <div class="howto">
       <div class="card">
@@ -279,6 +280,16 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <pre>journalctl -k -g 'UFW ' -o short-iso --since '-7d' &gt; ufw-journal.log</pre>
         <pre>journalctl -k -g 'UFW ' -o json &gt; ufw.json</pre>
         <pre>scp you@server:'~/ufw.log*' .</pre>
+        <h3>nftables / iptables / firewalld</h3>
+        <pre>journalctl -k -g 'SRC=' -o short-iso --since '-7d' &gt; netfilter.log</pre>
+        <ul>
+          <li>Any kernel log line with <code>SRC=</code>, <code>DST=</code> and <code>PROTO=</code> works. Its log prefix becomes the action: <code>nft-drop:</code>, <code>FINAL_REJECT:</code>, <code>IPTables-Dropped:</code>.</li>
+          <li>Prefixes that say drop, reject, deny or block count as blocks; accept, allow or pass as allowed; anything else as logged.</li>
+          <li>firewalld: <code>firewall-cmd --set-log-denied=all</code> turns logging of refused packets on.</li>
+        </ul>
+        <h3>fail2ban</h3>
+        <pre>sudo cp /var/log/fail2ban.log* ~/ &amp;&amp; sudo chown $USER ~/fail2ban.log*</pre>
+        <ul><li>Ban, Unban and Found lines; the jail shows as the rule. Load it with the web or firewall logs to see who fail2ban caught.</li></ul>
         <h3>OPNsense / pfSense</h3>
         <pre>scp 'root@opnsense:/var/log/filter/filter_*.log' .</pre>
         <pre>ssh root@opnsense 'cat /var/log/filter/latest.log' &gt; opnsense-today.log</pre>
@@ -305,6 +316,14 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>The audit log path is set by <code>SecAuditLog</code>. The JSON format (<code>SecAuditLogFormat JSON</code>) and the default native format both work.</li>
           <li>Apache and nginx error logs work too: each request's <code>ModSecurity:</code> lines are grouped by their <code>unique_id</code>.</li>
           <li>Name a file after its server (<code>shop-web.log</code>) to tell servers apart.</li>
+        </ul>
+        <h3>Cloudflare</h3>
+        <p style="margin:4px 0">Security events from the GraphQL API, with an API token that can read Analytics (set your zone ID and start time):</p>
+        <pre>curl -s https://api.cloudflare.com/client/v4/graphql -H "Authorization: Bearer $CF_API_TOKEN" -d '{"query":"{viewer{zones(filter:{zoneTag:\"ZONE_ID\"}){firewallEventsAdaptive(limit:10000,orderBy:[datetime_ASC],filter:{datetime_gt:\"2026-11-01T00:00:00Z\"}){action source ruleId description clientIP clientRequestHTTPHost clientRequestHTTPMethodName clientRequestPath clientRequestQuery userAgent edgeResponseStatus datetime rayName}}}}"}' &gt; cf-events.json</pre>
+        <ul>
+          <li>Or a Logpush job for the <code>firewall_events</code> dataset (one JSON object per line).</li>
+          <li>Blocks, challenges, logged and skipped events show as <code>WAF BLOCK</code>, <code>WAF CHALLENGE</code>, <code>WAF DETECT</code> and <code>WAF ALLOW</code>, grouped by the Cloudflare product that acted.</li>
+          <li>How far back the API goes depends on your plan; it returns at most 10,000 events per query.</li>
         </ul>
       </div>
       <div class="card">
@@ -765,7 +784,14 @@ function isChatter(r) {
 }
 function actId(label) {
   const id = D.act.id(label);
-  if (D.actGroup[id] === undefined) D.actGroup[id] = label.startsWith('LIMIT') ? 1 : label.startsWith('ALLOW') || label.startsWith('PASS') ? 2 : label.startsWith('AUDIT') || label.startsWith('WAF DETECT') ? 3 : 0;
+  if (D.actGroup[id] === undefined) {
+    const u = label.toUpperCase();
+    D.actGroup[id] = /^(LIMIT|WAF CHALLENGE)/.test(u) ? 1
+      : /^(AUDIT|WAF DETECT|F2B FOUND)/.test(u) ? 3
+      : /^(ALLOW|PASS|WAF ALLOW|F2B UNBAN)/.test(u) ? 2
+      : /^(BLOCK|DROP|REJECT|DENY|WAF BLOCK|F2B BAN|LIMIT BLOCK)/.test(u) ? 0
+      : /ACCEPT|ALLOW|PASS/.test(u) ? 2 : /DROP|REJECT|DENY|BLOCK|BAN/.test(u) ? 0 : /LIMIT/.test(u) ? 1 : 3;
+  }
   return id;
 }
 
@@ -812,6 +838,7 @@ function handleLine(line, ctx) {
     return ufwMsg(line, t.ts, host, ctx);
   }
   if (line.indexOf('ModSecurity: ') >= 0) { D.lines++; modsecErrorLine(line, ctx); return; }
+  if (line.indexOf(' fail2ban.') > 0 && fail2banLine(line, ctx)) { D.lines++; return; }
   const f = line.indexOf('filterlog');
   if (f >= 0) {
     D.lines++;
@@ -823,7 +850,8 @@ function handleLine(line, ctx) {
     if (m) filterlogCsv(m[1], t.ts, host, ctx);
     return;
   }
-  if (RE_WF.test(line)) { D.lines++; wfLine(line.trimEnd(), ctx); }
+  if (RE_WF.test(line)) { D.lines++; wfLine(line.trimEnd(), ctx); return; }
+  if (line.indexOf(' SRC=') > 0 && line.indexOf(' DST=') > 0 && line.indexOf('PROTO=') > 0) { D.lines++; netfilterLine(line, ctx); }
 }
 
 /* ---------- Windows Firewall (pfirewall.log, W3C extended format)
@@ -886,6 +914,10 @@ function handleJson(line, ctx) {
 function handleObj(o, ctx) {
   if (!o || typeof o !== 'object') return;
   if ((o.EventID || o.Id) && WFP_EVENTS[+(o.EventID || o.Id)] && ('DestAddress' in o || 'SourceAddress' in o)) { D.lines++; winSecEvent(o, ctx); return; }
+  if (('ClientIP' in o || 'clientIP' in o) && ('Action' in o || 'action' in o) && ('RayID' in o || 'rayName' in o || 'Source' in o || 'source' in o)) { D.lines++; cfEvent(o, ctx); return; }
+  const zones = o.data && o.data.viewer && (o.data.viewer.zones || o.data.viewer.accounts);
+  if (Array.isArray(zones)) { for (const z of zones) for (const e of z.firewallEventsAdaptive || []) { D.lines++; cfEvent(e, ctx); } return; }
+  if ('data' in o && Array.isArray(o.errors) && o.errors.length) throw new Error('Cloudflare API error: ' + o.errors.map(e => e.message).join('; '));
   if (o.transaction && typeof o.transaction === 'object') { D.lines++; if ('client_ip' in o.transaction) modsecV3(o, ctx); else modsecV2(o, ctx); return; }
   if (typeof o.MESSAGE === 'string') { // journalctl -o json
     const ts = o.__REALTIME_TIMESTAMP ? +o.__REALTIME_TIMESTAMP / 1000 : NaN, host = o._HOSTNAME || '';
@@ -895,6 +927,7 @@ function handleObj(o, ctx) {
   }
   if (o.action && (o.src || o.dst)) { D.lines++; opnApiObj(o, ctx); } // OPNsense API (Firewall > Log Files > Live View)
 }
+function tryJson(text, ctx) { try { jsonArray(text, ctx); } catch (e) { alert(e.message); } }
 function jsonArray(text, ctx) {
   let a; try { a = JSON.parse(text); } catch (e) { throw new Error('looks like JSON but does not parse: ' + e.message); }
   if (!Array.isArray(a)) a = [a];
@@ -943,7 +976,7 @@ const SEV_NAMES = ['emergency', 'alert', 'critical', 'error', 'warning', 'notice
 // rules that only add up or report scores, rather than detecting something themselves
 const isScoreRule = id => /^9(49|59|80)\d{3}$/.test(id) || /^90[0-5]\d{3}$/.test(id);
 function wafCategory(id, tags) {
-  for (const t of tags || []) { const c = TAG_CATS[String(t).toLowerCase()]; if (c) return c; }
+  for (const t of tags || []) { const c = TAG_CATS[String(t).toLowerCase()]; if (c) return c; if (/^cf-/.test(t)) return CF_SOURCES[t.slice(3)] || 'CF other'; }
   const n = +id;
   if (n >= 900000 && n < 1000000) return CRS_CATS[Math.floor(n / 1000)] || (isScoreRule(id) ? null : 'Other CRS');
   return id ? 'Custom' : null;
@@ -1007,6 +1040,28 @@ function realClient(ev, headers) {
   const xff = headerOf(headers, 'x-forwarded-for').split(',')[0].trim();
   if (xff && validIp(xff) && ev.src && (ipClass(ev.src) & 1)) { ev.via = ev.src; ev.viaKind = 2; ev.src = xff; D.viaProxy++; }
 }
+/* ---------- Cloudflare firewall events: Logpush (PascalCase NDJSON) or GraphQL firewallEventsAdaptive (camelCase)
+   They're WAF events at Cloudflare's edge: the client address is the real visitor, the host is "cloudflare", and
+   since the traffic is proxied they count as "via Cloudflare" (a firewall rule on the origin can't stop them). */
+const CF_SOURCES = { firewallManaged: 'CF managed rules', waf: 'CF managed rules', firewallCustom: 'CF custom rules', firewallrules: 'CF custom rules',
+  rateLimit: 'CF rate limiting', ratelimit: 'CF rate limiting', bic: 'CF browser integrity', ip: 'CF IP access rules', iprange: 'CF IP access rules', asn: 'CF IP access rules',
+  country: 'CF IP access rules', uaBlock: 'CF user-agent block', securitylevel: 'CF security level', l7ddos: 'CF DDoS', botManagement: 'CF bot management',
+  botFight: 'CF bot fight mode', zonelockdown: 'CF zone lockdown', hot: 'CF hotlink', validation: 'CF validation', apiShield: 'CF API shield' };
+function cfEvent(o, ctx) {
+  const g = k => o[k] ?? o[k.charAt(0).toLowerCase() + k.slice(1)];
+  const action = String(g('Action') || '').toLowerCase(), source = String(g('Source') || '');
+  const label = /^(block|connectionclose|drop)/.test(action) ? 'WAF BLOCK' : /challenge/.test(action) ? 'WAF CHALLENGE' : /^(allow|skip|bypass)/.test(action) ? 'WAF ALLOW' : 'WAF DETECT';
+  const ts = Date.parse(g('Datetime') || '');
+  const rule = String(g('RuleID') || g('RuleId') || o.ruleId || source || '');
+  const q = g('ClientRequestQuery') || '';
+  D.kinds.cf = 1; D.wafFmt.add('cloudflare'); D.viaCf++;
+  const ev = { ts, uid: g('RayID') || g('RayName') || o.rayName, src: g('ClientIP') || o.clientIP, site: g('ClientRequestHost') || o.clientRequestHTTPHost,
+    method: g('ClientRequestMethod') || o.clientRequestHTTPMethodName, uri: (g('ClientRequestPath') || '') + (q && !String(q).startsWith('?') ? '?' + q : q),
+    status: +(g('EdgeResponseStatus') || o.edgeResponseStatus || -1), ua: g('ClientRequestUserAgent') || o.userAgent || '',
+    msgs: [{ id: rule || 'cf', msg: g('Description') || o.description || CF_SOURCES[source] || ('Cloudflare ' + source), tags: ['cf-' + source] }],
+    intercepted: label !== 'WAF DETECT' && label !== 'WAF ALLOW', viaKind: 1, actLabel: label, host: 'cloudflare', cf: true };
+  wafEvent(ev, ctx);
+}
 // one normalised WAF event -> a row
 function wafEvent(ev, ctx) {
   D.kinds.waf = 1;
@@ -1033,7 +1088,7 @@ function wafEvent(ev, ctx) {
     if (m.id) { const c = wafCategory(m.id, m.tags); if (c) { let set = D.wcatOf.get(m.id); if (!set) D.wcatOf.set(m.id, c); } }
   }
   // no score reported at all: add up the detecting rules the way CRS does (critical 5, error 4, warning 3, notice 2)
-  if (score < 0 && detecting.length) {
+  if (score < 0 && detecting.length && !ev.cf) { // (Cloudflare events carry no scores)
     est = true; let si = 0, so = 0;
     for (const m of detecting) { const w = [5, 5, 5, 4, 3, 2][sevNum(m.sev)] ?? 0; if (/^95\d{4}$/.test(m.id || '')) so += w; else si += w; }
     score = si; if (oscore < 0 && so) oscore = so;
@@ -1049,7 +1104,7 @@ function wafEvent(ev, ctx) {
     D.wcomboCatList[ci] = [...new Set(ids.map(id => D.wcatOf.get(id)).filter(Boolean).map(c => D.wcat.id(c)))];
   }
   const uri = ev.uri || '', path = uri.split('?')[0];
-  addRow({ ts: ev.ts, host: wafHostName(ctx), act: ev.intercepted ? 'WAF BLOCK' : 'WAF DETECT', proto: 'HTTP',
+  addRow({ ts: ev.ts, host: ev.host || wafHostName(ctx), act: ev.actLabel || (ev.intercepted ? 'WAF BLOCK' : 'WAF DETECT'), proto: 'HTTP',
     src: ev.src, spt: ev.spt, dst: ev.dst, dpt: ev.dpt,
     w: { host: ev.site || '', uri, path, method: (ev.method || '').toUpperCase(), status: ev.status ?? -1, combo: ci, sev, score, oscore, ua: ev.ua || '', via: ev.viaKind || 0 } }, ctx);
 }
@@ -1219,7 +1274,10 @@ function ufwMsg(msg, ts, host, ctx) {
   const label = msg.slice(i + 5, j);
   const body = msg.slice(j + 1);
   if (isDup(ts, body, ctx)) return;
-
+  addPacketKv(body, label, ts, host, ctx);
+}
+// IN= OUT= SRC= DST= PROTO= SPT= DPT= ... as written by the netfilter LOG target (UFW, iptables, nftables, firewalld)
+function addPacketKv(body, label, ts, host, ctx) {
   const kv = Object.create(null);
   let flags = 0, depth = 0;
   const toks = body.split(' ');
@@ -1240,6 +1298,34 @@ function ufwMsg(msg, ts, host, ctx) {
     mac: kv.MAC && kv.MAC.length >= 35 ? kv.MAC.slice(18, 35) : '' }, ctx);
 }
 
+/* ---------- other netfilter logging: nftables "log prefix", iptables -j LOG --log-prefix, firewalld
+   Same key=value packet as UFW, after a free-form prefix ("nft-drop: ", "FINAL_REJECT: ", "IPTables-Dropped: ").
+   The prefix becomes the action, grouped by its wording (drop / reject / accept ...). */
+function netfilterLine(line, ctx) {
+  const k = line.indexOf('kernel:'), from = k >= 0 ? k + 7 : 0;
+  const inAt = line.indexOf(' IN=', from); if (inAt < 0) return;
+  D.kinds.nf = 1;
+  const t = parseTime(line, ctx);
+  let host = ''; if (t.len) { const hm = RE_HOST.exec(line.slice(t.len)); if (hm) host = hm[1]; }
+  const prefix = line.slice(from, inAt + 1).replace(/^\s*\[\s*\d+\.\d+\]\s*/, '').replace(/[:\s]+$/, '').trim();
+  const label = (prefix || 'LOG').toUpperCase().replace(/[_\s]+/g, ' ').slice(0, 40);
+  const body = line.slice(inAt + 1);
+  if (isDup(t.ts, body, ctx)) return;
+  addPacketKv(body, label, t.ts, host, ctx);
+}
+
+/* ---------- fail2ban's own log: what it found, banned and unbanned, per jail
+   2026-11-07 12:00:00,123 fail2ban.actions [1234]: NOTICE  [sshd] Ban 203.0.113.9 */
+const RE_F2B = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)(?:,(\d+))?\s+fail2ban\.\w+\s+\[\d+\]:\s+\w+\s+\[([^\]]+)\]\s+(Ban|Unban|Found|Restore Ban)\s+(\S+)/;
+function fail2banLine(line, ctx) {
+  const m = RE_F2B.exec(line); if (!m) return false;
+  D.kinds.f2b = 1;
+  const ts = wallTime(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + (m[7] ? +m[7].slice(0, 3) : 0);
+  if (isDup(ts, line.slice(19), ctx)) return true;
+  const what = m[9] === 'Found' ? 'F2B FOUND' : m[9] === 'Unban' ? 'F2B UNBAN' : 'F2B BAN';
+  addRow({ ts, host: '', act: what, proto: '?', src: m[10], rule: m[8] }, ctx);
+  return true;
+}
 function newCtx(ref) { const r = ref || Date.now(); return { ref: r, year: new Date(r).getFullYear(), keys: new Float64Array(4096), kn: 0, lo: Infinity, hi: -Infinity, nan: false, pk: 0, skipped0: D.skipped }; }
 function closeCtx(ctx) { wafFlush(ctx); if (ctx.kn) D.prior.push({ keys: ctx.keys.slice(0, ctx.kn), lo: ctx.lo, hi: ctx.hi, nan: ctx.nan, set: null }); }
 
@@ -1274,7 +1360,8 @@ async function readFile(file, idx, total) {
   const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
   const gz = head[0] === 0x1f && head[1] === 0x8b;
   // a JSON array, e.g. saved from the OPNsense API (not "[Sat Nov 07 ...", which is an Apache error log)
-  if (!gz && /^\s*\[\s*[{"\]]/.test(await file.slice(0, 64).text())) {
+  const head64 = gz ? '' : await file.slice(0, 64).text();
+  if (!gz && (/^\s*\[\s*[{"\]]/.test(head64) || /^\s*\{\s*"data"/.test(head64))) {
     const before = D.n; jsonArray(await file.text(), ctx); closeCtx(ctx);
     D.files.push({ name: file.name, events: D.n - before, skipped: D.skipped - ctx.skipped0 }); return;
   }
@@ -1336,7 +1423,7 @@ async function loadText(name, text, ref) {
   progress('Parsing ' + name + '…', null); await tick();
   const ctx = newCtx(ref); ctx.name = name;
   const before = D.n;
-  const lines = /^\s*\[\s*[{"\]]/.test(text) ? (jsonArray(text, ctx), []) : text.split('\n');
+  const lines = /^\s*\[\s*[{"\]]/.test(text) || /^\s*\{\s*"data"/.test(text) ? (tryJson(text, ctx), []) : text.split('\n');
   for (let i = 0; i < lines.length && !D.stop; i++) { handleLine(lines[i], ctx); if ((i & 32767) === 32767) { progress(`Parsing ${name}`, i / lines.length); await tick(); } }
   closeCtx(ctx);
   D.files.push({ name, events: D.n - before, skipped: D.skipped - ctx.skipped0, partial: !!D.stop });
@@ -1360,7 +1447,7 @@ function ipClass(s) { // 1 private/local, 2 multicast, 4 broadcast-ish, 8 v6
 function finish() {
   $('#progress').style.display = 'none';
   if (!D || !D.n) {
-    alert(D && D.lines ? 'Found firewall or WAF log lines but could not parse them.' : 'No firewall or WAF log lines found. Expected UFW lines ("[UFW BLOCK] ..."), OPNsense/pfSense filterlog lines, a Windows Firewall pfirewall.log, or ModSecurity audit or error logs.');
+    alert(D && D.lines ? 'Found firewall or WAF log lines but could not parse them.' : 'No firewall or WAF log lines found. Expected UFW or other netfilter lines ("[UFW BLOCK] ...", nftables or iptables log prefixes), OPNsense/pfSense filterlog lines, a Windows Firewall pfirewall.log, a fail2ban log, ModSecurity audit or error logs, or Cloudflare firewall events.');
     if (D && !D.n) D = null;
     return;
   }
@@ -1389,7 +1476,7 @@ function finish() {
   D.actWaf = Uint8Array.from(D.act.list, s => s.startsWith('WAF') ? 1 : 0);
   D.ipSeen = new Uint8Array(D.ip.list.length);
   for (let i = 0; i < D.n; i++) D.ipSeen[D.c.src[i]] |= D.actWaf[D.c.act[i]] ? 2 : 1;
-  D.both = D.waf && (D.kinds.ufw || D.kinds.opn || D.kinds.win);
+  D.both = D.waf && (D.kinds.ufw || D.kinds.opn || D.kinds.win || D.kinds.nf || D.kinds.f2b);
   D.wafRows = 0; if (D.waf) for (let i = 0; i < D.n; i++) if (D.actWaf[D.c.act[i]]) D.wafRows++;
   D.hasRules = D.rule.list.length > 1;
   $('#empty').hidden = true; $('#dash').hidden = false; $('#btnClear').hidden = false; $('#btnReport').hidden = false;
@@ -1763,7 +1850,7 @@ function renderAll() {
     (D.skipped ? ` ${fmtN(D.skipped)} events skipped while loading (load options).` : '') +
     (D.viaCf ? ` ${fmtN(D.viaCf)} WAF requests came through Cloudflare and are shown with the visitor's real address (CF-Connecting-IP).` : '') +
     (D.viaProxy ? ` ${fmtN(D.viaProxy)} came through a local proxy and use X-Forwarded-For.` : '') + ` About ${fmtN(memMB())} MB in memory.` + (D.noTime ? ` ${fmtN(D.noTime)} events have no timestamp (plain dmesg) and are left out of time charts.` : '') +
-    ` Times shown in your browser's timezone (${BROWSER_TZ})` + (D.kinds.ufw || D.kinds.win ? `; logs without a timezone were read as ${tzLabel()}.` : '.');
+    ` Times shown in your browser's timezone (${BROWSER_TZ})` + (D.kinds.ufw || D.kinds.win || D.kinds.nf || D.kinds.f2b ? `; logs without a timezone were read as ${tzLabel()}.` : '.');
 }
 function renderTiles() {
   const c = D.c, n = SEL.length;
@@ -2144,7 +2231,7 @@ const DIMS = {
            name: k => (k >= 1000 ? 'v6 ' : 'v4 ') + (k % 1000), sub: k => icmpName(k >= 1000 ? 'ICMPv6' : 'ICMP', k % 1000), tok: k => 'type:' + (k % 1000), skip: k => k < 0 },
   mac:   { label: 'Source MACs', key: i => D.c.mac[i], name: k => D.mac.list[k] || '(none)', tok: k => D.mac.list[k] ? 'mac:' + D.mac.list[k] : null },
   host:  { label: 'Logging hosts', key: i => D.c.host[i], name: k => D.host.list[k] || '(unknown)', tok: k => D.host.list[k] ? 'host:' + D.host.list[k] : null },
-  rule:  { label: 'Firewall rules (OPNsense)', key: i => D.c.rule[i], name: k => ruleName(D.rule.list[k]), sub: k => ruleLabel(D.rule.list[k]) ? D.rule.list[k].slice(0, 8) : '', tok: k => 'rule:' + D.rule.list[k], skip: k => k === 0 },
+  rule:  { label: 'Firewall rules / jails', key: i => D.c.rule[i], name: k => ruleName(D.rule.list[k]), sub: k => ruleLabel(D.rule.list[k]) ? D.rule.list[k].slice(0, 8) : '', tok: k => 'rule:' + D.rule.list[k], skip: k => k === 0 },
   act:   { label: 'Actions (exact tag)', key: i => D.c.act[i], name: k => D.act.list[k], tok: k => 'act:' + D.act.list[k].replace(/ /g, '_') },
   app:   { label: 'Programs (Windows)', key: i => D.c.app[i], name: k => D.app.list[k], tok: k => /\s/.test(D.app.list[k]) ? null : 'app:' + D.app.list[k], skip: k => k === 0 },
   attack: { label: 'Attack types (WAF)', multi: i => D.wcomboCatList[D.c.wr[i]], name: k => D.wcat.list[k], tok: k => 'attack:' + D.wcat.list[k].replace(/ /g, '_') },
@@ -2237,7 +2324,7 @@ function dimApplies(k) {
 function autoView() {
   const kinds = Object.keys(D.kinds).length, hosts = D.host.list.filter(Boolean).length;
   // A: who, B: what. Mixed logs or several machines: split by machine first.
-  const packets = D.kinds.ufw || D.kinds.opn || D.kinds.win;
+  const packets = D.kinds.ufw || D.kinds.opn || D.kinds.win || D.kinds.nf || D.kinds.f2b;
   const auto = D.waf && !packets ? { dimA: 'src', dimB: 'attack' }
     : D.waf ? { dimA: 'src', dimB: 'host' }
     : kinds > 1 || hosts > 1 ? { dimA: 'host', dimB: 'dpt' }
@@ -2395,7 +2482,7 @@ function renderWhatIf() {
     }
     det.append(sec);
   }
-  const mode = D.act.list.some(a => a === 'WAF BLOCK') ? '' : 'Nothing in these logs was actually blocked (detection-only mode), so this is what blocking mode would have done. ';
+  const mode = D.act.list.some(a => /^WAF (BLOCK|CHALLENGE)/.test(a)) ? '' : 'Nothing in these logs was actually blocked (detection-only mode), so this is what blocking mode would have done. ';
   $('#wiSub').textContent = `${fmtN(total)} WAF requests in this filter`;
   const note = $('#wiNote');
   note.hidden = !(mode || D.scoreEst);
@@ -2732,7 +2819,7 @@ function ipRank() {
   for (let i = 0; i < D.ip.list.length; i++) if (!D.ip.list[i]) D.ipRank[i] = -1;
   return D.ipRank;
 }
-const hasPackets = () => !D.waf || D.kinds.ufw || D.kinds.opn || D.kinds.win;
+const hasPackets = () => !D.waf || D.kinds.ufw || D.kinds.opn || D.kinds.win || D.kinds.nf || D.kinds.f2b;
 const EV_COLS = [
   { id: 'time', label: 'Time' },
   { id: 'act', label: 'Action', rank: () => { const r = byLabel(D.act.list, i => D.act.list[i]); return i => r[D.c.act[i]]; } },
@@ -3061,7 +3148,7 @@ function blockCandidates() {
     if (isWaf) {
       s.waf++; s.uas.set(c.ua[i], (s.uas.get(c.ua[i]) || 0) + 1); if (c.via[i] === 1) s.cf++;
       const v = s.paths.get(c.path[i]); if (v) v.n++; else s.paths.set(c.path[i], { n: 1, t });
-      if (!D.act.list[c.act[i]].startsWith('WAF BLOCK')) s.reached++; // not intercepted: it reached the web app
+      if (!/^WAF (BLOCK|CHALLENGE)/.test(D.act.list[c.act[i]])) s.reached++; // not intercepted: it reached the web app
       if ((D.wcomboRules[c.wr[i]] || []).some(r => { const id = D.wrule.list[r]; return !isScoreRule(id) && !/^9(11|20)\d{3}$/.test(id); })) s.attack++;
     } else {
       const p = c.dpt[i];
@@ -3149,7 +3236,7 @@ $('#blockAllow').value = blockAllow;
 $('#blockDropped').onchange = e => { blockShowDropped = e.target.checked; if (D && D.n) renderBlock(); };
 $('#blockAllow').onchange = e => { blockAllow = e.target.value.trim(); try { localStorage.setItem(BLOCK_ALLOW_KEY, blockAllow); } catch {} if (D && D.n) renderBlock(); };
 // pick a sensible default script format from what's loaded
-function blockDefaultFmt() { const k = D.kinds; if (D.waf && D.viaCf > D.wafRows / 2) return 'cloudflare'; return k.opn ? 'opnalias' : k.ufw ? 'ufw' : k.win ? 'win' : D.waf ? 'modsec' : 'ufw'; }
+function blockDefaultFmt() { const k = D.kinds; if (D.waf && D.viaCf > D.wafRows / 2) return 'cloudflare'; return k.opn ? 'opnalias' : k.ufw ? 'ufw' : k.nf ? 'nft' : k.win ? 'win' : D.waf ? 'modsec' : 'ufw'; }
 function blockScripts(list, fmt) {
   const v4 = list.filter(x => !x.includes(':')), v6 = list.filter(x => x.includes(':'));
   const stamp = new Date().toISOString().slice(0, 10);

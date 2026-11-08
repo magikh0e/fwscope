@@ -20,3 +20,8 @@ rules.debug
 
 # local test fixtures
 .private-test/
+
+# test tooling (package.json is the exception to *.json above)
+!package.json
+!package-lock.json
+node_modules/

@@ -15,10 +15,13 @@ body:
       label: Which logs?
       multiple: true
       options:
-        - UFW / iptables
+        - UFW
+        - nftables / iptables / firewalld
         - OPNsense / pfSense
         - Windows Firewall
+        - fail2ban
         - ModSecurity / Coraza
+        - Cloudflare
         - Something else
   - type: input
     id: filter

@@ -1,0 +1,14 @@
+{
+  "name": "fwscope",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline firewall and WAF log dashboard in one HTML file. The page has no dependencies; this file is only for the tests.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-reporter=spec"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}

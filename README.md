@@ -2,7 +2,9 @@
 
 # fwscope
 
-A single-file, offline visualizer for firewall and WAF logs: UFW / iptables, OPNsense / pfSense, Windows Firewall, and ModSecurity / Coraza. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box. The one exception is the optional hostname lookup, which is off unless you turn it on (see [Hostnames](#hostnames-reverse-dns)).
+[![tests](https://github.com/magikh0e/fwscope/actions/workflows/test.yml/badge.svg)](https://github.com/magikh0e/fwscope/actions/workflows/test.yml)
+
+A single-file, offline visualizer for firewall and WAF logs: UFW, nftables / iptables / firewalld, OPNsense / pfSense, Windows Firewall, fail2ban, ModSecurity / Coraza, and Cloudflare firewall events. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box. The one exception is the optional hostname lookup, which is off unless you turn it on (see [Hostnames](#hostnames-reverse-dns)).
 
 ![fwscope dashboard on a week of sample firewall and WAF logs: summary tiles, events over time split into firewall and WAF panels, a world map of sources with the top networks, and what blocking mode would do at each anomaly threshold](assets/screenshot.png)
 
@@ -17,7 +19,7 @@ A single-file, offline visualizer for firewall and WAF logs: UFW / iptables, OPN
 - `dmesg -T` (plain `dmesg` works too, but those lines have no wall-clock time, so they're left out of the time charts)
 - Pasted lines
 
-Lines without a `[UFW ...]` tag are ignored, so you can feed it a whole `syslog`. Drop several files at once to merge them. UFW's default rsyslog config writes each line to `ufw.log`, `kern.log` *and* `syslog`, so a line that shows up again in a later file is skipped as a duplicate.
+Lines that aren't firewall log lines are ignored, so you can feed it a whole `syslog`. Drop several files at once to merge them. UFW's default rsyslog config writes each line to `ufw.log`, `kern.log` *and* `syslog`, so a line that shows up again in a later file is skipped as a duplicate.
 
 ### Getting the logs
 
@@ -28,6 +30,20 @@ journalctl -k -g 'UFW ' -o json > ufw.json
 ```
 
 `sudo ufw logging medium` also logs allowed new connections (ALLOW). At `low`, you only see blocks and rate-limited hits.
+
+### nftables, iptables and firewalld
+
+Any kernel log line with `SRC=`, `DST=` and `PROTO=` is read the same way as a UFW line, whatever its log prefix: nftables `log prefix "nft-drop: "`, iptables `-j LOG --log-prefix "IPTables-Dropped: "`, or firewalld's `FINAL_REJECT:` and friends. The prefix becomes the action. Prefixes that say drop, reject, deny or block count as blocks; accept, allow or pass as allowed; limit as rate limited; anything else as logged (the AUDIT group).
+
+```bash
+journalctl -k -g 'SRC=' -o short-iso --since '-7d' > netfilter.log
+```
+
+firewalld logs refused packets after `firewall-cmd --set-log-denied=all`.
+
+### fail2ban
+
+fail2ban's own log (`/var/log/fail2ban.log`) shows what it found, banned and unbanned. Each line becomes an event: **F2B BAN** (blocks, including `Restore Ban` after a restart), **F2B FOUND** (a matched failure, in the AUDIT group) or **F2B UNBAN** (allowed group). The jail (`sshd`, `nginx-botsearch` …) shows as the rule, so the Rules list and `rule:sshd` work. Load it alongside the firewall or WAF logs to see which attackers fail2ban caught and which it missed.
 
 ## OPNsense / pfSense
 
@@ -186,6 +202,28 @@ Pairs that wouldn't change what's blocked (often a low-weight rule like 920350 o
 
 Name a file after its server (`shop-web.log`) and it shows under that name in **Host**. Generic names like `modsec_audit.log` show as `waf`.
 
+## Cloudflare firewall events
+
+Cloudflare's security events (WAF managed rules, custom rules, rate limiting, browser integrity checks, IP access rules, bot fight mode …) load as WAF events, from either:
+
+- the **GraphQL API**, `firewallEventsAdaptive`, saved as JSON, or
+- a **Logpush** job for the `firewall_events` dataset (one JSON object per line).
+
+```bash
+curl -s https://api.cloudflare.com/client/v4/graphql \
+  -H "Authorization: Bearer $CF_API_TOKEN" \
+  -d '{"query":"{viewer{zones(filter:{zoneTag:\"ZONE_ID\"}){firewallEventsAdaptive(limit:10000,orderBy:[datetime_ASC],filter:{datetime_gt:\"2026-11-01T00:00:00Z\"}){action source ruleId description clientIP clientRequestHTTPHost clientRequestHTTPMethodName clientRequestPath clientRequestQuery userAgent edgeResponseStatus datetime rayName}}}}"}' \
+  > cf-events.json
+```
+
+The token needs read access to the zone's Analytics. The API returns at most 10,000 events per query, and how far back it goes depends on your plan. If Cloudflare answers with an error (wrong zone ID, token without access), fwscope shows it.
+
+- **Actions:** block → **WAF BLOCK**, any challenge → **WAF CHALLENGE** (the LIMIT group), log → **WAF DETECT**, skip / allow → **WAF ALLOW**.
+- **Attack types:** the Cloudflare product that acted (CF managed rules, CF custom rules, CF rate limiting …). The rule's description becomes its message.
+- **Host** is `cloudflare`, and the client address is the real visitor.
+- **Block suggestions** count events Cloudflare blocked or challenged as already stopped. For the rest, the Cloudflare format is the one to use, since your own firewall only ever sees Cloudflare's addresses.
+- There are no anomaly scores, so these events stay out of the what-if and tuning numbers.
+
 ## World map and network owners (GeoIP)
 
 Drop a GeoIP database in `.mmdb` format on the page (or use **Add GeoIP database** on the map card). `.mmdb.gz` works as downloaded. You get:
@@ -319,6 +357,15 @@ The filter bar also has time presets (relative to the newest event in the logs, 
 - Classic syslog, `dmesg -T` and Windows Firewall timestamps have no timezone (syslog has no year either; it's inferred from the file's modified date). **Logs without a timezone are in**, under the header, sets the zone the logging machine was in: your browser's own by default, UTC, or any named zone like `America/New_York`. Named zones handle daylight saving. It applies to logs you load next. ISO, journal and OPNsense timestamps carry their own offset and aren't affected. Everything is shown in your browser's timezone.
 - Data is stored in columns of typed arrays (about 55 bytes per event), so filtering stays fast even with millions of events.
 - **Sample data** generates a fake week of logs using the documentation IP ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32), so no real addresses are implicated.
+
+## Tests
+
+The page itself has no dependencies. The tests use Node's built-in runner and [jsdom](https://github.com/jsdom/jsdom) to load `index.html` and drive its real code: every log format, the filter language, saved views, block suggestions, and the sample loading without errors. They run on every push.
+
+```bash
+npm install
+npm test
+```
 
 ## Community and support
 
