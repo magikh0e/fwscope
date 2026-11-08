@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions, ideas and show-and-tell
+    url: https://github.com/magikh0e/fwscope/discussions
+    about: Ask how to read something, suggest a feature, or share what you found. Issues are for bugs.
+  - name: Report a security problem privately
+    url: https://github.com/magikh0e/fwscope/security/advisories/new
+    about: Please don't open a public issue for security problems.

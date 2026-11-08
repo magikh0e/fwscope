@@ -1,0 +1,45 @@
+name: Bug report
+description: Something parses wrong, a chart is off, or the page breaks.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. **Please don't paste raw logs.** They contain your IP addresses, hostnames and sometimes request contents.
+        If a log line doesn't parse, swap the real addresses for documentation ones (192.0.2.x, 198.51.100.x, 203.0.113.x, 2001:db8::) before sharing a line or two.
+  - type: dropdown
+    id: source
+    attributes:
+      label: Which logs?
+      multiple: true
+      options:
+        - UFW / iptables
+        - OPNsense / pfSense
+        - Windows Firewall
+        - ModSecurity / Coraza
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: A sample line (anonymised)
+      description: One or two lines that show the problem, with real addresses replaced.
+      render: text
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: e.g. Firefox 140, Chrome 141
+  - type: textarea
+    id: console
+    attributes:
+      label: Anything in the browser console?
+      description: Press F12, open the Console tab and copy any red errors.
+      render: text

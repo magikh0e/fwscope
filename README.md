@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/fwscope-badge.webp" alt="fwscope: firewall log visualizer" width="320"></p>
+<p align="center"><img src="assets/fwscope-badge.webp" alt="fwscope: firewall and WAF log visualizer" width="320"></p>
 
 # fwscope
 
@@ -248,6 +248,13 @@ The filter bar also has time presets (relative to the newest event in the logs, 
 - Classic syslog, `dmesg -T` and Windows Firewall timestamps have no timezone (syslog has no year either; it's inferred from the file's modified date). **Logs without a timezone are in**, under the header, sets the zone the logging machine was in: your browser's own by default, UTC, or any named zone like `America/New_York`. Named zones handle daylight saving. It applies to logs you load next. ISO, journal and OPNsense timestamps carry their own offset and aren't affected. Everything is shown in your browser's timezone.
 - Data is stored in columns of typed arrays (about 55 bytes per event), so filtering stays fast even with millions of events.
 - **Sample data** generates a fake week of logs using the documentation IP ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32), so no real addresses are implicated.
+
+## Community and support
+
+- **Questions, ideas, things you found:** [Discussions](https://github.com/magikh0e/fwscope/discussions)
+- **Bugs:** [Issues](https://github.com/magikh0e/fwscope/issues). Please swap real addresses for documentation ones before pasting log lines.
+- **Security problems:** report them [privately](https://github.com/magikh0e/fwscope/security/advisories/new); see [SECURITY.md](SECURITY.md).
+- **Like it?** [Buy me a coffee](https://buymeacoffee.com/magikh0e).
 
 ## License
 
