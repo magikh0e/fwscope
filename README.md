@@ -4,7 +4,7 @@
 
 A single-file, offline visualizer for firewall and WAF logs: UFW / iptables, OPNsense / pfSense, Windows Firewall, and ModSecurity / Coraza. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box.
 
-![fwscope dashboard showing a week of sample firewall logs: summary tiles, events over time, a world map of sources with the top networks, and new sources, networks, countries and ports in the last 24 hours](assets/screenshot.png)
+![fwscope dashboard on a week of sample firewall and WAF logs: summary tiles, events over time split into firewall and WAF panels, a world map of sources with the top networks, and what blocking mode would do at each anomaly threshold](assets/screenshot.png)
 
 *The built-in sample data (made-up documentation addresses). Open `index.html?demo` to see it live.*
 
