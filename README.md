@@ -102,7 +102,7 @@ How it maps onto the dashboard:
 - **Abuse report** (Events card): with the filter narrowed to one outside source, drafts a plain-text report for that network's abuse desk. It includes a subject line, what happened (e.g. "a fast port scan: 1,027 ports probed within 3 minutes" or "repeated connection attempts to port 22 (SSH), consistent with brute-force login attempts"), times in UTC, targeted ports, and 15 sample log lines. Interface and rule names are left out. Nothing is sent: you review it, copy it or save it. Links to the address's RDAP record (where the abuse contact is) and to AbuseIPDB's report form open only if you click them.
 - **Keyboard**: everything that filters on click can also be reached with Tab: Top-list rows, map countries with events, New card rows, scan rows and event table cells. Enter filters, Shift+Enter excludes, and focusing a row shows its tooltip. Table headers sort with Enter.
 
-Click any row or cell to filter on it. Shift-click excludes it instead.
+Click any row or cell to filter on it. Clicking another value of the same kind (another address, another port) replaces the first, rather than asking for both at once. Shift-click excludes a value instead, and excludes add up.
 
 **Starting views.** Until you pick something, the Top lists and the New window are chosen to fit what you load:
 - OPNsense logs with rules open on **Firewall rules**.

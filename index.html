@@ -1584,10 +1584,13 @@ function setQuery(q, force) {
   catch (e) { $('#qerr').textContent = e.message + (force ? ' (filter ignored)' : ''); if (!force) return; F.preds = []; }
   F.page = 0; apply();
 }
+// Click: show only this value, replacing an earlier click on the same field (two src: terms would have to match
+// at once, which nothing can). Shift-click: exclude it; excludes add up. Other fields and excludes are kept.
 function addToken(tok, neg) {
-  const t = (neg ? '-' : '') + tok;
-  const parts = $('#q').value.trim().split(/\s+/).filter(Boolean).filter(x => x !== tok && x !== '-' + tok);
-  parts.push(t);
+  const field = tok.slice(0, tok.indexOf(':') + 1);
+  const parts = $('#q').value.trim().split(/\s+/).filter(Boolean).filter(x =>
+    x !== tok && x !== '-' + tok && !(!neg && field && x.startsWith(field)));
+  parts.push((neg ? '-' : '') + tok);
   setQuery(parts.join(' '));
 }
 let qTimer;
