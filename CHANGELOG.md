@@ -2,6 +2,18 @@
 
 What changed in each release of fwscope. The newest is at the top. Version numbers follow [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+- **Suricata alerts:** `eve.json` (alert events, also when forwarded through syslog) and `fast.log`. Signatures show as rules, IPS drops as blocks, and `seen:ids` filters to sources Suricata alerted on.
+- **Blocklists:** drop a list of addresses and ranges (Spamhaus DROP, FireHOL, your own) to mark sources on it, filter them with `listed:`, and weigh it in block suggestions. Checked offline, and kept in the browser until removed.
+- **Loaded files card:** each file's events, duplicates and skipped lines, with a **Remove** button that re-reads the others.
+- **Folders:** drop a folder (subfolders included) or pick one with **Folder**.
+- The sample data includes Suricata alerts.
+
+### Changed
+- Files are parsed in a background worker, so the page stays responsive during big loads and **Stop** reacts at once. If a browser won't start the worker, parsing runs on the page as before.
+
 ## 1.1.0 (2026-11-08)
 
 ### Added

@@ -165,3 +165,40 @@ test('Cloudflare firewall events: GraphQL response, and its errors', async () =>
   await p.load('cf-events.json', JSON.stringify({ data: null, errors: [{ message: 'zone not found' }] }));
   assert.ok(p.alerts.some(a => a.includes('zone not found')), 'the API error is shown');
 });
+
+test('Suricata eve.json: alerts only, signature as the rule, blocked in IPS mode', async () => {
+  const eve = (o) => JSON.stringify({ timestamp: '2026-11-07T10:00:00.123456+0000', flow_id: Math.floor(Math.random() * 1e15), in_iface: 'igb0', event_type: 'alert',
+    src_ip: '203.0.113.5', src_port: 40000, dest_ip: '192.0.2.1', dest_port: 22, proto: 'TCP',
+    alert: { action: 'allowed', gid: 1, signature_id: 2001219, rev: 20, signature: 'ET SCAN Potential SSH Scan', category: 'Attempted Information Leak', severity: 2 }, ...o });
+  const { p, rows } = await rowsOf('opnsense-eve.json', [
+    eve(),
+    eve({ timestamp: '2026-11-07T10:00:01.000000-1000', src_ip: '2001:db8::7', dest_ip: '2001:db8::1', proto: 'IPv6-ICMP', icmp_type: 128, icmp_code: 0, src_port: undefined, dest_port: undefined,
+      alert: { action: 'blocked', signature_id: 2100366, signature: 'GPL ICMP_INFO PING *NIX' } }),
+    JSON.stringify({ timestamp: '2026-11-07T10:00:02.000000+0000', flow_id: 1, event_type: 'flow', src_ip: '203.0.113.5', dest_ip: '192.0.2.1', proto: 'TCP' }),
+    'Nov  7 10:00:03 opnsense suricata[4242]: {"timestamp":"2026-11-07T10:00:03.000000+0000","flow_id":7,"event_type":"alert","src_ip":"198.51.100.9","src_port":5555,"dest_ip":"192.0.2.1","dest_port":3389,"proto":"TCP","alert":{"action":"allowed","signature_id":2023753,"signature":"ET SCAN MS Terminal Server Traffic on Non-standard Port"}}',
+  ].join('\n'));
+  assert.deepEqual(rows.map(r => [r.act, r.group, r.src, r.dpt, r.rule, r.host]), [
+    ['IDS ALERT', 3, '203.0.113.5', 22, 'sid:2001219', 'opnsense-eve'],
+    ['IDS DROP', 0, '2001:db8::7', -1, 'sid:2100366', 'opnsense-eve'],
+    ['IDS ALERT', 3, '198.51.100.9', 3389, 'sid:2023753', 'opnsense-eve']]);
+  assert.equal(rows[0].ts, Date.UTC(2026, 10, 7, 10, 0, 0, 123));
+  assert.equal(rows[1].ts, Date.UTC(2026, 10, 7, 20, 0, 1));
+  assert.equal(rows[1].proto, 'ICMPv6'); assert.equal(rows[0].iin, 'igb0');
+  assert.equal(p.g('ruleName("sid:2001219")'), 'ET SCAN Potential SSH Scan');
+  const count = q => p.g(`F.preds = compileQuery(${JSON.stringify(q)}); filterRows(null).length`);
+  assert.equal(count('seen:ids'), 3);
+  assert.equal(count('rule:sid:2001219'), 1);
+});
+
+test('Suricata fast.log', async () => {
+  const { rows } = await rowsOf('fast.log', [
+    '11/07/2026-10:00:00.123456  [**] [1:2001219:20] ET SCAN Potential SSH Scan [**] [Classification: Attempted Information Leak] [Priority: 2] {TCP} 203.0.113.5:40000 -> 192.0.2.1:22',
+    '11/07/2026-10:00:01.000000  [Drop] [**] [1:2100366:8] GPL ICMP_INFO PING *NIX [**] [Classification: Misc activity] [Priority: 3] {ICMP} 203.0.113.6:8 -> 192.0.2.1:0',
+    '11/07/2026-10:00:02.000000  [**] [1:2210000:1] SURICATA STREAM test [**] [Classification: Generic Protocol Command Decode] [Priority: 3] {TCP} [2001:db8::5]:443 -> [2001:db8::1]:51000',
+  ].join('\n'));
+  assert.deepEqual(rows.map(r => [r.act, r.src, r.spt, r.dst, r.dpt, r.rule, r.host]), [
+    ['IDS ALERT', '203.0.113.5', 40000, '192.0.2.1', 22, 'sid:2001219', ''],
+    ['IDS DROP', '203.0.113.6', -1, '192.0.2.1', -1, 'sid:2100366', ''],
+    ['IDS ALERT', '2001:db8::5', 443, '2001:db8::1', 51000, 'sid:2210000', '']]);
+  assert.equal(rows[0].ts, Date.UTC(2026, 10, 7, 10, 0, 0, 123));
+});

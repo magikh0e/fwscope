@@ -4,7 +4,7 @@
 
 [![tests](https://github.com/magikh0e/fwscope/actions/workflows/test.yml/badge.svg)](https://github.com/magikh0e/fwscope/actions/workflows/test.yml)
 
-A single-file, offline visualizer for firewall and WAF logs: UFW, nftables / iptables / firewalld, OPNsense / pfSense, Windows Firewall, fail2ban, ModSecurity / Coraza, and Cloudflare firewall events. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box. The one exception is the optional hostname lookup, which is off unless you turn it on (see [Hostnames](#hostnames-reverse-dns)).
+A single-file, offline visualizer for firewall and WAF logs: UFW, nftables / iptables / firewalld, OPNsense / pfSense, Windows Firewall, fail2ban, Suricata, ModSecurity / Coraza, and Cloudflare firewall events. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box. The one exception is the optional hostname lookup, which is off unless you turn it on (see [Hostnames](#hostnames-reverse-dns)).
 
 ![fwscope dashboard on a week of sample firewall and WAF logs: summary tiles, events over time split into firewall and WAF panels, a world map of sources with the top networks, and what blocking mode would do at each anomaly threshold](assets/screenshot.png)
 
@@ -19,7 +19,10 @@ A single-file, offline visualizer for firewall and WAF logs: UFW, nftables / ipt
 - `dmesg -T` (plain `dmesg` works too, but those lines have no wall-clock time, so they're left out of the time charts)
 - Pasted lines
 
-Lines that aren't firewall log lines are ignored, so you can feed it a whole `syslog`. Drop several files at once to merge them. You can also add files later: once logs are loaded, **Open logs** becomes **Add logs**, and dropping files on the dashboard adds them too. Each addition says how many new events it brought and how many duplicates were skipped. **Clear** starts over. UFW's default rsyslog config writes each line to `ufw.log`, `kern.log` *and* `syslog`, so a line that shows up again in a later file is skipped as a duplicate.
+Lines that aren't firewall log lines are ignored, so you can feed it a whole `syslog`. Drop several files at once to merge them. You can also add files later: once logs are loaded, **Open logs** becomes **Add logs**, and dropping files on the dashboard adds them too. Each addition says how many new events it brought and how many duplicates were skipped. **Clear** starts over.
+
+- **Folders:** drop a whole folder (subfolders too), or use **Folder** to pick one. Hidden files and things that can't be logs (images, archives other than `.gz`, binaries) are skipped.
+- **Loaded files:** the card at the bottom of the dashboard lists each file with its events, duplicates and skipped lines. **Remove** takes one out by re-reading the others, so counts and duplicates come out as if it had never been loaded. Your view, filter and block ticks stay. UFW's default rsyslog config writes each line to `ufw.log`, `kern.log` *and* `syslog`, so a line that shows up again in a later file is skipped as a duplicate.
 
 ### Getting the logs
 
@@ -154,6 +157,20 @@ Lists that would be empty for the loaded logs are greyed out in the menus. Once 
 
 **Saved views.** Everything you set is saved in the page address, e.g. `index.html#q=dpt:22&t=7d&n=1&d=src,cc,asn`. That covers the filter, time range, action toggles, checkboxes and which lists the Top cards show. Bookmark that address and it opens the same view on whatever logs you load. The browser also remembers your last view for next time, apart from a zoomed time range, which rarely fits the next set of logs. **Reset view** clears it all.
 
+## Suricata (IDS / IPS)
+
+Suricata's alerts load as packet events: source, destination, ports, protocol and the sensor's interface, with the signature as the rule (`rule:sid:2001219`, and the Rules list shows the signature text).
+
+- **`eve.json`**: alert events only (flow, dns, http and the rest are skipped). Lines forwarded through syslog (`suricata[123]: {...}`) work too.
+- **`fast.log`**: the one-line alert format.
+- **Actions:** **IDS ALERT** (the AUDIT group), or **IDS DROP** (blocks) when IPS mode dropped it (`"action": "blocked"`, or a `[Drop]` prefix in fast.log).
+- **Cross-check:** `seen:ids` filters to sources Suricata alerted on. The Sources list notes **IDS too** for addresses also in the firewall or WAF logs, and block suggestions count Suricata alerts as supporting evidence.
+- **Sensor name:** the eve `host` field when present, otherwise the file name (rename `eve.json` to `opnsense-eve.json` to tell sensors apart).
+
+```bash
+scp 'root@opnsense:/var/log/suricata/eve.json*' .
+```
+
 ## ModSecurity / Coraza (WAF)
 
 It reads ModSecurity's logs in any of the usual forms:
@@ -257,6 +274,7 @@ The header emblem and favicon are drawn from that same map by `tools/build-logo.
 
 A busy firewall writes a lot: one real OPNsense box here logs about 850K events (200 MB) a day. The page handles that in a few ways:
 
+- **Background parsing:** files are read in a background worker, so the page stays responsive while a big load runs and **Stop** takes effect at once. (A 245 MB, one-million-event OPNsense day loads in about 3 seconds here; the page never pauses for more than a few hundredths of a second.) If a browser refuses to start the worker, parsing falls back to the page itself.
 - **Load options**, under the header, apply to files you load next. Skipped events never take up memory:
   - **Skip LAN chatter** drops multicast, broadcast, IGMP and IPv6 neighbor discovery.
   - **Blocks only** drops ALLOW / PASS events, usually the bulk of a router's log.
@@ -312,6 +330,19 @@ Behind Cloudflare the jails use fail2ban's `cloudflare-token` action, since a lo
 
 Every script starts with the date and the number of entries, and has its undo script at the bottom, commented out. Review the list first: blocking a shared address (a VPN exit, a carrier NAT, a cloud range) can shut out real people.
 
+## Blocklists
+
+Drop a plain list of addresses and ranges, one per line, along with your logs or on its own: Spamhaus DROP, a FireHOL `.netset` or `.ipset`, or your own list. Comments after `#` or `;` are ignored. fwscope recognises such a file by its contents (or the `.netset` / `.ipset` extension) and doesn't read it as a log.
+
+- Sources on a list show **on &lt;list&gt;** in the Sources list, and block suggestions count it as supporting evidence (it never suggests a block on its own).
+- `listed:any` filters to sources on any list, `listed:drop` to a list by name (globs work), `-listed:any` to the rest.
+- Up to 8 lists at once. They're kept in this browser (IndexedDB) until you remove them with the buttons under the dashboard. Loading a newer copy of a list replaces the old one.
+- It's all checked here: nothing is looked up online.
+
+```bash
+curl -sO https://www.spamhaus.org/drop/drop.txt
+```
+
 ## Hostnames (reverse DNS)
 
 **Hostnames**, in the filter bar, adds each address's reverse DNS name next to it, e.g. `66.249.66.1 crawl-66-249-66-1.googlebot.com`. It's **off by default**, because it's the one thing in fwscope that sends data off your machine:
@@ -343,7 +374,8 @@ The filter box takes space-separated terms. All of them must match.
 | `score:` | `score:10-1000`: requests with an inbound anomaly score of 10 or more (WAF) |
 | `rdns:` | `rdns:googlebot.com` (hostname ends with), `rdns:*.amazonaws.com`, `rdns:confirmed`, `rdns:unconfirmed`, `rdns:none` (looked up, no name). Only sources that have been looked up can match; see [Hostnames](#hostnames-reverse-dns) |
 | `app:` | `app:firefox.exe`, `app:steam`, `app:svc*` (Windows Security log) |
-| `seen:` | `seen:both`: addresses in both the firewall and the WAF logs (`seen:waf`, `seen:fw`); `seen:f2b`: sources fail2ban banned |
+| `seen:` | `seen:both`: addresses in both the firewall and the WAF logs (`seen:waf`, `seen:fw`); `seen:f2b`: sources fail2ban banned; `seen:ids`: sources Suricata alerted on |
+| `listed:` | `listed:any`: sources on a loaded blocklist; `listed:drop` for one list by name |
 | `act:` | `act:block`, `act:limit_block`, `act:audit_invalid` |
 | `flag:` | `flag:syn`, `flag:rst` (SYN ACK FIN RST PSH URG ECE CWR DF) |
 | `type:` `ttl:` `len:` | `type:8` (ICMP echo request), `ttl:1-10` |

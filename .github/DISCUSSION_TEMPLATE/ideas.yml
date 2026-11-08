@@ -26,6 +26,7 @@ body:
         - OPNsense / pfSense
         - Windows Firewall
         - fail2ban
+        - Suricata
         - ModSecurity / Coraza
         - Cloudflare
         - Something else

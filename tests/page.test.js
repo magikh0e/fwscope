@@ -183,3 +183,42 @@ test('pasting real lines replaces the sample instead of mixing with it', async (
   assert.equal(p.g('D.n'), 5);
   assert.equal(p.g('$("#toast").hidden'), true, 'a replacement is not an "added" message');
 });
+
+test('blocklists: detected on drop, sources on them marked and filterable', async () => {
+  const p = openPage();
+  const File = globalThis.File; // Node's File: jsdom's lacks text() and stream()
+  const list = new File(['# test list\n; another comment\n203.0.113.0/29 ; SBL1\n198.51.100.7\n2001:db8::/32\n192.0.2.200\n'], 'drop.txt');
+  const log = new File([LINES.join('\n')], 'ufw.log', { lastModified: Date.UTC(2026, 10, 7, 12) });
+  await p.w.loadFiles([list, log]);
+  assert.equal(p.g('BLISTS.length'), 1);
+  assert.equal(p.g('D.files.length'), 1, 'the list is not read as a log');
+  const count = q => p.g(`F.preds = compileQuery(${JSON.stringify(q)}); filterRows(null).length`);
+  assert.equal(count('listed:any'), 4, '203.0.113.5, .6, 198.51.100.7 and the IPv6 source');
+  assert.equal(count('listed:drop'), 4);
+  assert.equal(count('-listed:any'), 1);
+  assert.throws(() => p.g('compileQuery("listed:nosuch")'), /no blocklist named/);
+  assert.equal(p.g('onList(BLISTS[0], "203.0.113.8")'), false, 'just past the /29');
+  assert.equal(p.g('onList(BLISTS[0], "203.0.113.7")'), true);
+  assert.match(p.g('DIMS.src.sub(D.ip.map.get("198.51.100.7"))'), /on drop/);
+});
+
+test('a log file is not mistaken for a blocklist', () => {
+  const p = openPage();
+  assert.equal(p.g(`looksLikeBlocklistText(${JSON.stringify(LINES.join('\n'))})`), false);
+  assert.equal(p.w.looksLikeBlocklistText(['203.0.113.1', '203.0.113.2', '198.51.100.0/24 ; x'].join('\n')), true);
+});
+
+test('remove one loaded file: the others are re-read as if it was never there', async () => {
+  const p = openPage();
+  await p.load('a.log', LINES.slice(0, 3).join('\n'));
+  await p.load('b.log', LINES.slice(2).join('\n'));
+  assert.equal(p.g('D.n'), 5);
+  assert.equal(p.w.document.querySelectorAll('#filesTable tr').length, 3, 'header + two files');
+  p.g('BLOCKSEL.add("x")');
+  await p.g('removeFile(0)');
+  assert.equal(p.g('D.files.map(f => f.name).join()'), 'b.log');
+  assert.equal(p.g('D.n'), 3, 'b.log alone, its duplicate line now counted');
+  assert.equal(p.g('D.dupes'), 0);
+  assert.ok(p.g('BLOCKSEL.has("x")'), 'ticks kept');
+  assert.match(p.g('$("#toast").textContent'), /^Removed a\.log\. 1 file loaded\./);
+});
