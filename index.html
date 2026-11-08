@@ -274,6 +274,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <input type="text" id="q" placeholder="filter: src:1.2.3.0/24 dpt:22,23 -proto:udp in:eth0 host:web1" spellcheck="false" autocomplete="off">
         <label class="tog"><input type="checkbox" id="hideNoise"> Hide broadcast/multicast</label>
         <label class="tog"><input type="checkbox" id="publicOnly"> Public sources only</label>
+        <button id="btnReset" title="Clear the filter, time range, action toggles and checkboxes">Reset view</button>
       </div>
       <div id="qerr" class="qerr"></div>
     </div>
@@ -945,7 +946,7 @@ function finish() {
   $('#empty').hidden = true; $('#dash').hidden = false; $('#btnClear').hidden = false;
   F.page = 0;
   buildActChips();
-  apply();
+  setQuery(F.q, true); // compiles a restored filter now that there's data to match against
 }
 
 /* ============================================================ query language */
@@ -1058,6 +1059,63 @@ function compileQuery(q) {
 const F = { preset: 'all', range: null, acts: [true, true, true, true], q: '', preds: [], hideNoise: false, publicOnly: false, page: 0, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn' };
 let SEL = new Uint32Array(0);
 
+/* ============================================================ view state: kept in the page address and the browser
+   #q=dpt:22&t=7d&a=1101&n=1&p=1&d=src,dpt,asn&o=1   (t is a preset or "from-to" in epoch ms)
+   The address makes a view bookmarkable; local storage brings it back on the next visit.
+   A zoomed time range is only kept in the address: it rarely fits the next set of logs. */
+const VIEW_DEFAULT = { preset: 'all', range: null, acts: [true, true, true, true], q: '', hideNoise: false, publicOnly: false, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn' };
+function viewString(withRange) {
+  const p = new URLSearchParams();
+  if (F.q.trim()) p.set('q', F.q.trim());
+  if (withRange && F.range) p.set('t', F.range.map(Math.round).join('-')); else if (F.preset !== 'all') p.set('t', F.preset);
+  if (F.acts.some(a => !a)) p.set('a', F.acts.map(a => a ? 1 : 0).join(''));
+  if (F.hideNoise) p.set('n', '1');
+  if (F.publicOnly) p.set('p', '1');
+  if (F.oldestFirst) p.set('o', '1');
+  const dims = [F.dimA, F.dimB, F.dimC].join(',');
+  if (dims !== 'src,dpt,asn') p.set('d', dims);
+  return p.toString();
+}
+function readView(str) {
+  const p = new URLSearchParams(str.replace(/^#/, '')), v = structuredClone(VIEW_DEFAULT);
+  if (p.has('q')) v.q = p.get('q');
+  const t = p.get('t') || '';
+  const r = /^(\d{10,})-(\d{10,})$/.exec(t);
+  if (r) v.range = [+r[1], +r[2]]; else if (['1h', '24h', '7d', '30d'].includes(t)) v.preset = t;
+  if (/^[01]{4}$/.test(p.get('a') || '')) v.acts = [...p.get('a')].map(x => x === '1');
+  v.hideNoise = p.get('n') === '1'; v.publicOnly = p.get('p') === '1'; v.oldestFirst = p.get('o') === '1';
+  const d = (p.get('d') || '').split(',');
+  ['dimA', 'dimB', 'dimC'].forEach((k, i) => { if (d[i] && DIM_KEYS.includes(d[i])) v[k] = d[i]; });
+  return v;
+}
+// dimension keys, known before DIMS is defined further down
+const DIM_KEYS = ['src', 'src24', 'cc', 'asn', 'dst', 'dpt', 'spt', 'proto', 'iin', 'iout', 'icmp', 'mac', 'host', 'rule', 'act'];
+function setView(v) {
+  Object.assign(F, v, { page: 0 });
+  $('#q').value = F.q; $('#qerr').textContent = '';
+  $('#hideNoise').checked = F.hideNoise; $('#publicOnly').checked = F.publicOnly; $('#oldestFirst').checked = F.oldestFirst;
+  for (const id of ['A', 'B', 'C']) { const s = document.querySelector(`[data-rank="${id}"] .dimSel`); if (s && s.options.length) s.value = F['dim' + id]; }
+}
+let viewSaved = '';
+function saveView() {
+  const h = viewString(true);
+  if (h === viewSaved) return;
+  viewSaved = h;
+  try { history.replaceState(null, '', h ? '#' + h : location.pathname + location.search); } catch {}
+  try { localStorage.setItem('fwscope-view', viewString(false)); } catch {}
+}
+// restore: an address with a view wins, otherwise the last one used in this browser
+(function restoreView() {
+  let s = location.hash.length > 1 ? location.hash : '';
+  if (!s) { try { s = localStorage.getItem('fwscope-view') || ''; } catch {} }
+  if (s) setView(readView(s));
+})();
+addEventListener('hashchange', () => {
+  if (location.hash.replace(/^#/, '') === viewSaved) return;
+  setView(readView(location.hash));
+  if (D && D.n) { buildActChips(); setQuery(F.q, true); }
+});
+
 function timeWindow() {
   if (F.range) return F.range;
   const span = { '1h': 36e5, '24h': 864e5, '7d': 6048e5, '30d': 2592e6 }[F.preset];
@@ -1083,6 +1141,7 @@ function apply() {
   }
   SEL = out.subarray(0, m);
   renderAll();
+  saveView();
 }
 
 /* ============================================================ UI: filter bar */
@@ -1100,10 +1159,12 @@ function buildActChips() {
     box.append(b);
   });
 }
-function setQuery(q) {
+// force: render even when the filter doesn't compile (a restored view whose filter needs data that
+// isn't loaded, e.g. cc: without a GeoIP database), ignoring the filter and showing why
+function setQuery(q, force) {
   $('#q').value = q; F.q = q;
   try { F.preds = compileQuery(q); $('#qerr').textContent = ''; }
-  catch (e) { $('#qerr').textContent = e.message; return; }
+  catch (e) { $('#qerr').textContent = e.message + (force ? ' (filter ignored)' : ''); if (!force) return; F.preds = []; }
   F.page = 0; apply();
 }
 function addToken(tok, neg) {
@@ -1437,7 +1498,7 @@ for (const id of ['A', 'B', 'C']) {
   const sel = card.querySelector('.dimSel');
   for (const [k, d] of Object.entries(DIMS)) { const o = el('option', null, d.label); o.value = k; sel.append(o); }
   sel.value = F['dim' + id];
-  sel.onchange = () => { F['dim' + id] = sel.value; renderRank(id); };
+  sel.onchange = () => { F['dim' + id] = sel.value; renderRank(id); saveView(); };
 }
 const TOPN = 15;
 function renderRank(id) {
@@ -1645,7 +1706,7 @@ function renderEvents() {
 }
 $('#pgNew').onclick = () => { F.page--; renderEvents(); };
 $('#pgOld').onclick = () => { F.page++; renderEvents(); };
-$('#oldestFirst').onchange = e => { F.oldestFirst = e.target.checked; F.page = 0; renderEvents(); };
+$('#oldestFirst').onchange = e => { F.oldestFirst = e.target.checked; F.page = 0; renderEvents(); saveView(); };
 
 /* ============================================================ exports */
 let outName = 'export.txt';
@@ -1811,6 +1872,7 @@ $('#btnPaste').onclick = () => { $('#pasteText').value = ''; $('#pasteDlg').show
 $('#pasteCancel').onclick = () => $('#pasteDlg').close();
 $('#pasteGo').onclick = () => { const t = $('#pasteText').value; $('#pasteDlg').close(); if (t.trim()) loadText('pasted text', t); };
 $('#btnClear').onclick = () => { D = null; $('#dash').hidden = true; $('#empty').hidden = false; $('#btnClear').hidden = true; F.range = null; F.preset = 'all'; F.acts = [true, true, true, true]; setQueryText(''); };
+$('#btnReset').onclick = () => { setView(structuredClone(VIEW_DEFAULT)); if (D && D.n) { buildActChips(); setQuery(''); } else saveView(); };
 function setQueryText(q) { $('#q').value = q; F.q = q; F.preds = []; $('#qerr').textContent = ''; }
 // drag & drop anywhere on the page
 addEventListener('dragover', e => { e.preventDefault(); $('#drop').classList.add('over'); });

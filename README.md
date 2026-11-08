@@ -87,6 +87,8 @@ How it maps onto the dashboard:
 
 Click any row or cell to filter on it. Shift-click excludes it instead.
 
+**Saved views.** Everything you set is saved in the page address, e.g. `index.html#q=dpt:22&t=7d&n=1&d=src,cc,asn`. That covers the filter, time range, action toggles, checkboxes and which lists the Top cards show. Bookmark that address and it opens the same view on whatever logs you load. The browser also remembers your last view for next time, apart from a zoomed time range, which rarely fits the next set of logs. **Reset view** clears it all.
+
 ## World map and network owners (GeoIP)
 
 Drop a GeoIP database in `.mmdb` format on the page (or use **Add GeoIP database** on the map card). `.mmdb.gz` works as downloaded. You get:
