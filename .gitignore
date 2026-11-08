@@ -1,0 +1,13 @@
+# real firewall logs never go in the repo
+*.log
+*.log.*
+syslog
+syslog.*
+logs/
+*.json
+
+# GeoIP databases (licensed separately, and large)
+*.mmdb
+*.mmdb.gz
+
+.claude/
