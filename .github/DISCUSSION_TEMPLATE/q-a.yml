@@ -1,0 +1,28 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask anything about reading your logs with fwscope. **Please don't paste raw logs**: swap real addresses for documentation ones (192.0.2.x, 198.51.100.x, 203.0.113.x, 2001:db8::) first.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: dropdown
+    id: logs
+    attributes:
+      label: Which logs?
+      multiple: true
+      options:
+        - UFW / iptables
+        - OPNsense / pfSense
+        - Windows Firewall
+        - ModSecurity / Coraza
+        - Something else
+  - type: input
+    id: filter
+    attributes:
+      label: Filter or view you were using (optional)
+      description: The filter box contents, or the page address after the "#", so others can see the same view.
+      placeholder: e.g. dpt:22 act:block  or  #q=dpt%3A22&t=7d

@@ -1,0 +1,22 @@
+title: "[Found] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share something interesting fwscope showed you: a scanner, a fake crawler, a false positive you tuned away. **Anonymise your own addresses and hostnames** before posting (attackers' public addresses are fine to mention).
+  - type: textarea
+    id: found
+    attributes:
+      label: What you found
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How you spotted it
+      description: Which card, filter or view showed it.
+  - type: textarea
+    id: action
+    attributes:
+      label: What you did about it (optional)
+      description: Blocked it, tuned a rule, reported it ...

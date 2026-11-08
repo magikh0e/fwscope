@@ -1,0 +1,43 @@
+name: Log format request
+description: A firewall, WAF or log format fwscope doesn't read yet, or reads wrong.
+labels: [log format]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A few anonymised sample lines are the most useful thing you can send. Swap real addresses for documentation ones (192.0.2.x, 198.51.100.x, 203.0.113.x, 2001:db8::) and remove hostnames or anything else private.
+  - type: input
+    id: product
+    attributes:
+      label: Firewall / WAF and version
+      placeholder: e.g. nftables 1.0.9, Sophos XG 20, AWS WAF, fail2ban 1.1
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Where the log comes from
+      description: File path, export menu, API or command.
+      placeholder: e.g. /var/log/kern.log, journalctl -o json, Log Viewer -> Export CSV
+    validations:
+      required: true
+  - type: textarea
+    id: samples
+    attributes:
+      label: Sample lines (anonymised)
+      description: Three to ten lines, ideally including a block and an allow if the log has both.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: meaning
+    attributes:
+      label: What the fields mean
+      description: Anything that isn't obvious, e.g. which column is the action, or whether times are UTC. A link to the vendor's log format docs helps too.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before sending
+      options:
+        - label: I replaced real addresses and hostnames in the samples.
+          required: true
