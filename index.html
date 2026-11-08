@@ -73,7 +73,7 @@ header.top h1 span { color: var(--muted); font-weight: 400; }
 #drop p { color: var(--ink-2); margin: 6px 0; }
 .howto { margin-top: 18px; display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
 @media (max-width: 860px) { .howto { grid-template-columns: 1fr; } }
-.howto pre { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; overflow-x: auto; margin: 6px 0; font: 12px/1.5 var(--mono); }
+.howto pre { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; font: 12px/1.5 var(--mono); }
 .howto ul { margin: 6px 0; padding-left: 18px; color: var(--ink-2); }
 .howto h3 { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin: 12px 0 4px; }
 
@@ -192,7 +192,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
 
   <section id="empty">
     <div id="drop">
-      <h2 style="margin:0 0 6px">Drop UFW or OPNsense logs here</h2>
+      <h2 style="margin:0 0 6px">Drop UFW, OPNsense or Windows Firewall logs here</h2>
+      <p>Windows: <code>pfirewall.log</code> (copy it out from an admin prompt first).</p>
       <p>OPNsense / pfSense: <code>/var/log/filter/filter_*.log</code>, remote-syslog copies, or Live View API JSON.</p>
       <p>Plain <code>ufw.log</code>, rotated <code>.gz</code> files, <code>kern.log</code>/<code>syslog</code>, <code>dmesg -T</code> or <code>journalctl</code> output (text or <code>-o json</code>).</p>
       <p>Drop several at once to merge them. Duplicates across files are skipped (UFW writes the same line to ufw.log, kern.log and syslog).</p>
@@ -216,6 +217,13 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>One file per day; a busy firewall writes a few hundred MB a day. Drop a day or two at a time, or gzip them first (<code>gzip filter_*.log</code>).</li>
           <li>Logs sent to a remote syslog server work too.</li>
         </ul>
+        <h3>Windows Firewall</h3>
+        <pre>Set-NetFirewallProfile -All -LogBlocked True -LogMaxSizeKilobytes 32767</pre>
+        <pre>Copy-Item C:\Windows\System32\LogFiles\Firewall\pfirewall.log* $HOME\Desktop\</pre>
+        <ul>
+          <li>Run both in an admin PowerShell. Logging is off by default; the first line turns on logging of dropped packets.</li>
+          <li>Rename each copy after its PC (<code>office-pc.log</code>): the log has no hostname, so the file name is used.</li>
+        </ul>
       </div>
       <div class="card">
         <h2>What gets logged</h2>
@@ -231,6 +239,12 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>Each rule logs only if its <b>Log</b> box is ticked (Firewall → Rules → edit the rule).</li>
           <li>The built-in default block and pass rules have their own logging switches under Firewall → Settings.</li>
           <li>Rules show up by ID. Match an ID to its rule under Firewall → Rules, or load Live View API JSON to get rule descriptions and interface names (WAN, LAN).</li>
+        </ul>
+        <h3>Windows Firewall</h3>
+        <ul>
+          <li><code>-LogBlocked True</code>: dropped packets (DROP). <code>-LogAllowed True</code> adds allowed connections (ALLOW), which is very noisy on a desktop.</li>
+          <li>No interface, rule or TTL is logged. Direction shows as <code>receive</code> (In) or <code>send</code> (Out).</li>
+          <li>Times are local with no timezone, so read the log in the same timezone as the PC.</li>
         </ul>
       </div>
     </div>
@@ -584,6 +598,7 @@ function parseTime(line, ctx) {
 }
 
 function handleLine(line, ctx) {
+  if (line.charCodeAt(0) === 35) return wfHeader(line, ctx); // '#': Windows Firewall log header
   if (line.length < 20) return;
   if (line.charCodeAt(0) === 123) return handleJson(line, ctx); // '{'
   const u = line.indexOf('[UFW ');
@@ -603,7 +618,42 @@ function handleLine(line, ctx) {
     if (t.len) { const hm = RE_HOST.exec(l.slice(t.len)); if (hm) host = hm[1]; }
     const m = /(?:^|\s)(\d+,\d*,.*)$/.exec(l.slice(l.indexOf('filterlog') + 9));
     if (m) filterlogCsv(m[1], t.ts, host, ctx);
+    return;
   }
+  if (RE_WF.test(line)) { D.lines++; wfLine(line.trimEnd(), ctx); }
+}
+
+/* ---------- Windows Firewall (pfirewall.log, W3C extended format)
+   #Fields: date time action protocol src-ip dst-ip src-port dst-port size tcpflags tcpsyn tcpack tcpwin icmptype icmpcode info path [pid]
+   Times are local with no zone. The log has no hostname, so the file name is used
+   (rename pfirewall.log to the PC's name to tell machines apart), or a "#Host: name" line. */
+const RE_WF = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d (?:ALLOW|DROP)\b/;
+const WF_DEFAULT = 'date time action protocol src-ip dst-ip src-port dst-port size tcpflags tcpsyn tcpack tcpwin icmptype icmpcode info path pid'.split(' ');
+const WF_PATH = { RECEIVE: ['receive', ''], SEND: ['', 'send'], FORWARD: ['forward', ''] };
+function wfHeader(line, ctx) {
+  const m = /^#(\w+):\s*(.*?)\s*$/.exec(line);
+  if (!m) return;
+  if (m[1] === 'Fields') ctx.wfFields = m[2].split(/\s+/);
+  else if (m[1] === 'Host') ctx.wfHost = m[2];
+}
+function wfHostName(ctx) {
+  if (ctx.wfHost) return ctx.wfHost;
+  const stem = (ctx.name || '').replace(/(\.(log|old|txt|gz))+$/i, '');
+  return !stem || /^pfirewall$/i.test(stem) ? 'windows' : stem;
+}
+function wfLine(line, ctx) {
+  const v = line.split(' '), F = ctx.wfFields || WF_DEFAULT, o = {};
+  for (let i = 0; i < F.length && i < v.length; i++) if (v[i] !== '-') o[F[i]] = v[i];
+  if (!o.date || !o.time) return;
+  const [y, mo, d] = o.date.split('-').map(Number), [h, mi, s] = o.time.split(':').map(Number);
+  const ts = new Date(y, mo - 1, d, h, mi, s).getTime();
+  if (isDup(ts, line, ctx)) return;
+  const p = (o.protocol || '?').toUpperCase();
+  const proto = /^\d+$/.test(p) ? PROTO_NUM[p] || 'proto ' + p : p === 'ICMPV6' ? 'ICMPv6' : p;
+  const [iin, iout] = WF_PATH[(o.path || '').toUpperCase()] || ['', ''];
+  const n = x => x !== undefined && /^\d+$/.test(x) ? +x : undefined;
+  addRow({ ts, host: wfHostName(ctx), act: o.action, proto, src: o['src-ip'], dst: o['dst-ip'], spt: n(o['src-port']), dpt: n(o['dst-port']),
+    iin, iout, len: n(o.size), flags: tcpFlags(o.tcpflags), itype: n(o.icmptype), icode: n(o.icmpcode) });
 }
 // duplicate check: same second + same packet description, seen in an earlier file
 function isDup(ts, body, ctx) {
@@ -726,7 +776,7 @@ const tick = () => new Promise(r => setTimeout(r, 0));
 function progress(text, frac) { $('#progress').style.display = 'block'; $('#progText').textContent = text; $('#progBar').style.width = (frac == null ? 100 : Math.round(frac * 100)) + '%'; }
 
 async function readFile(file, idx, total) {
-  const ctx = newCtx(file.lastModified);
+  const ctx = newCtx(file.lastModified); ctx.name = file.name;
   const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
   const gz = head[0] === 0x1f && head[1] === 0x8b;
   if (!gz && /^\s*\[/.test(await file.slice(0, 64).text())) { // a JSON array, e.g. saved from the OPNsense API
@@ -776,7 +826,7 @@ async function loadFiles(files) {
 async function loadText(name, text, ref) {
   if (!D) resetStore();
   progress('Parsing ' + name + '…', null); await tick();
-  const ctx = newCtx(ref);
+  const ctx = newCtx(ref); ctx.name = name;
   const before = D.n;
   const lines = /^\s*\[/.test(text) ? (jsonArray(text, ctx), []) : text.split('\n');
   for (let i = 0; i < lines.length; i++) { handleLine(lines[i], ctx); if ((i & 32767) === 32767) { progress(`Parsing ${name}: ${fmtN(D.n)} events`, i / lines.length); await tick(); } }
@@ -802,7 +852,7 @@ function ipClass(s) { // 1 private/local, 2 multicast, 4 broadcast-ish, 8 v6
 function finish() {
   $('#progress').style.display = 'none';
   if (!D || !D.n) {
-    alert(D && D.lines ? 'Found firewall log lines but could not parse them.' : 'No firewall log lines found. Expected UFW lines ("[UFW BLOCK] ...") or OPNsense/pfSense filterlog lines.');
+    alert(D && D.lines ? 'Found firewall log lines but could not parse them.' : 'No firewall log lines found. Expected UFW lines ("[UFW BLOCK] ..."), OPNsense/pfSense filterlog lines, or a Windows Firewall pfirewall.log.');
     if (D && !D.n) D = null;
     return;
   }
@@ -1540,10 +1590,28 @@ function makeSample() {
     add(t, o);
   }
 
+  // 11) a Windows desktop on the LAN with pfirewall.log logging (dropped inbound, some allowed outbound)
+  const WIN = '192.168.1.60';
+  for (let t = startT; t < end; t += ri(60, 600) * 1000) {
+    const r = rnd(), lan = '192.168.1.' + pick([31, 44, 50, 77, 112]);
+    if (r < 0.3) add(t, { win: true, act: 'DROP', proto: 'UDP', src: lan, dst: pick(['224.0.0.251', '239.255.255.250', '224.0.0.252']), spt: pick([5353, 5355, ri(49152, 65535)]), dpt: pick([5353, 1900, 5355]), len: ri(60, 400), path: 'RECEIVE' });
+    else if (r < 0.45) add(t, { win: true, act: 'DROP', proto: 'TCP', src: lan, dst: WIN, spt: ri(49152, 65535), dpt: pick([445, 139, 135, 3389, 5985]), len: 52, flags: 'S', path: 'RECEIVE' });
+    else if (r < 0.55) add(t, { win: true, act: 'DROP', proto: 'UDP', src: lan, dst: '192.168.1.255', spt: 137, dpt: pick([137, 138]), len: 78, path: 'RECEIVE' });
+    else if (r < 0.6) add(t, { win: true, act: 'DROP', proto: 'ICMP', src: lan, dst: WIN, len: 60, itype: 8, path: 'RECEIVE' });
+    else if (r < 0.66) add(t, { win: true, act: 'DROP', proto: 'UDP', src: 'fe80::' + pick(['1a2b:3cff:fe4d:5e6f', '9e1:22ff:fe33:4455']), dst: 'ff02::1:3', spt: ri(49152, 65535), dpt: 5355, len: 70, path: 'RECEIVE' });
+    else add(t, { win: true, act: 'ALLOW', proto: pick(['TCP', 'TCP', 'TCP', 'UDP']), src: WIN, dst: pub(), spt: ri(49152, 65535), dpt: pick([443, 443, 443, 80, 53, 123]), len: 0, path: 'SEND' });
+  }
+
   ev.sort((a, b) => a.t - b.t);
   const up0 = 1234567.0;
-  return ev.map(e => {
+  return '#Version: 1.5\n#Software: Microsoft Windows Firewall\n#Time Format: Local\n#Host: DESKTOP-LAN60\n' +
+    '#Fields: date time action protocol src-ip dst-ip src-port dst-port size tcpflags tcpsyn tcpack tcpwin icmptype icmpcode info path pid\n' + ev.map(e => {
     const d = new Date(e.t + ri(0, 999));
+    if (e.win) {
+      const tcp = e.proto === 'TCP' && e.path === 'RECEIVE', icmp = e.proto === 'ICMP';
+      return [`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`, e.act, e.proto, e.src, e.dst,
+        icmp ? '-' : e.spt, icmp ? '-' : e.dpt, e.len, tcp ? e.flags : '-', tcp ? ri(1, 4e9) : '-', tcp ? 0 : '-', tcp ? 64240 : '-', icmp ? e.itype : '-', icmp ? 0 : '-', '-', e.path, e.act === 'ALLOW' ? pick([4, 3812, 10244]) : 4].join(' ');
+    }
     if (e.opn) {
       const v6 = e.src.includes(':'), pn = { tcp: 6, udp: 17, icmp: 1 }[e.proto];
       let csv = `${e.rule[1]},,,${e.rule[0]},${e.iface},match,${e.act},${e.dir},`;

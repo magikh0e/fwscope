@@ -2,7 +2,7 @@
 
 # fwscope
 
-A single-file, offline visualizer for UFW / iptables and OPNsense / pfSense firewall logs. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box.
+A single-file, offline visualizer for UFW / iptables, OPNsense / pfSense and Windows Firewall logs. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box.
 
 ## What it reads
 
@@ -46,6 +46,25 @@ How OPNsense data maps onto the dashboard:
 - The matching rule becomes a **Rule** column, a "Firewall rules" Top list, and a `rule:` filter. A plain log only has the rule's 32-character ID, which the page shortens. To see which rule an ID belongs to, look it up in OPNsense under Firewall → Rules.
 
 Plain `filterlog` lines don't contain interface descriptions, so you'll see `igb0` / `vtnet1` rather than WAN / LAN.
+
+## Windows Firewall
+
+It reads `pfirewall.log`, the Windows Firewall log, including the rotated `pfirewall.log.old`. Logging is off by default. In an admin PowerShell, turn it on and copy the log out (the file is only readable as admin):
+
+```powershell
+Set-NetFirewallProfile -All -LogBlocked True -LogMaxSizeKilobytes 32767
+Copy-Item C:\Windows\System32\LogFiles\Firewall\pfirewall.log* $HOME\Desktop\
+```
+
+Add `-LogAllowed True` to log allowed connections too; that's very noisy on a desktop. 32767 KB is the largest log Windows allows, and it keeps one older copy.
+
+How it maps onto the dashboard:
+
+- `DROP` counts as a block and `ALLOW` as allowed.
+- The log has no interface names, so **In** shows `receive` for inbound packets and **Out** shows `send` for outbound ones. Filter with `in:receive` or `out:send`.
+- The log has no hostname either. **Host** is the file name, so rename each copy after its PC (`office-pc.log`) to tell machines apart. Otherwise it shows as `windows`. A `#Host: name` line at the top of the file also works.
+- No rule name or TTL is logged. Times are local with no timezone, so they're read as your browser's local time.
+- The parser follows the `#Fields:` header, so the extra process-ID column on newer Windows builds is fine.
 
 ## What you get
 
