@@ -2,7 +2,7 @@
 
 What changed in each release of fwscope. The newest is at the top. Version numbers follow [semantic versioning](https://semver.org/).
 
-## Unreleased
+## 1.2.0 (2026-11-08)
 
 ### Added
 - **Suricata alerts:** `eve.json` (alert events, also when forwarded through syslog) and `fast.log`. Signatures show as rules, IPS drops as blocks, and `seen:ids` filters to sources Suricata alerted on.
