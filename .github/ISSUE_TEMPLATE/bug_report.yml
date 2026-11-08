@@ -15,12 +15,14 @@ body:
       options:
         - UFW
         - nftables / iptables / firewalld
+        - OpenWrt
         - OPNsense / pfSense
         - Windows Firewall
         - fail2ban
         - Suricata
         - ModSecurity / Coraza
         - Cloudflare
+        - AWS VPC / Azure flow logs
         - Other / not sure
     validations:
       required: true

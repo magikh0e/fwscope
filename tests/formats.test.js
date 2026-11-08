@@ -55,10 +55,12 @@ test('fail2ban log: ban, found and unban per jail', async () => {
     '2026-11-07 10:10:04,123 fail2ban.actions        [811]: NOTICE  [sshd] Unban 203.0.113.5',
     '2026-11-07 10:10:05,000 fail2ban.actions        [811]: NOTICE  [sshd] Restore Ban 203.0.113.7',
     '2026-11-07 10:10:06,000 fail2ban.server         [811]: INFO    Starting Fail2ban v1.1.0',
+    '2026-11-07 10:10:07,000 fail2ban.actions        [811]: WARNING [sshd] 203.0.113.7 already banned',
+    '2026-11-07 10:10:08,000 fail2ban.filter         [811]: INFO    [sshd] Ignore 192.0.2.1 by ip',
   ].join('\n'));
   assert.deepEqual(rows.map(r => [r.act, r.group, r.src, r.rule]), [
     ['F2B BAN', 0, '203.0.113.5', 'sshd'], ['F2B FOUND', 3, '203.0.113.6', 'nginx-botsearch'],
-    ['F2B UNBAN', 2, '203.0.113.5', 'sshd'], ['F2B BAN', 0, '203.0.113.7', 'sshd']]);
+    ['F2B UNBAN', 2, '203.0.113.5', 'sshd'], ['F2B BAN', 0, '203.0.113.7', 'sshd'], ['F2B REPEAT', 3, '203.0.113.7', 'sshd']]);
   assert.equal(rows[0].ts, Date.UTC(2026, 10, 7, 10, 0, 4, 123));
   assert.equal(p.g('D.kinds.f2b'), 1);
 });
@@ -201,4 +203,73 @@ test('Suricata fast.log', async () => {
     ['IDS DROP', '203.0.113.6', -1, '192.0.2.1', -1, 'sid:2100366', ''],
     ['IDS ALERT', '2001:db8::5', 443, '2001:db8::1', 51000, 'sid:2210000', '']]);
   assert.equal(rows[0].ts, Date.UTC(2026, 10, 7, 10, 0, 0, 123));
+});
+
+test('OpenWrt: fw4 and fw3 log prefixes, from logread or remote syslog', async () => {
+  const { p, rows } = await rowsOf('logread.txt', [
+    'Sat Nov  7 10:00:01 2026 kern.warn kernel: [12345.678901] drop wan in: IN=eth1 OUT= MAC=00:11:22:33:44:55:66:77:88:99:aa:bb:08:00 SRC=203.0.113.5 DST=192.0.2.10 LEN=60 TOS=0x00 PREC=0x00 TTL=50 ID=1 DF PROTO=TCP SPT=40000 DPT=22 WINDOW=64240 RES=0x00 SYN URGP=0',
+    'Sat Nov  7 10:00:02 2026 kern.warn kernel: [12346.000001] reject lan forward: IN=br-lan OUT=eth1 SRC=192.168.1.20 DST=198.51.100.9 LEN=60 PROTO=TCP SPT=50000 DPT=25',
+    'Sat Nov  7 10:00:03 2026 kern.warn kernel: [12347.000001] DROP(src wan)IN=eth0.2 OUT= MAC=00:11:22:33:44:55:66:77:88:99:aa:bb:08:00 SRC=203.0.113.6 DST=192.0.2.10 LEN=40 PROTO=TCP SPT=4000 DPT=23',
+    'Sat Nov  7 10:00:04 2026 kern.warn kernel: [12348.000001] ACCEPT(dest wan)IN=br-lan OUT=eth0.2 SRC=192.168.1.20 DST=198.51.100.10 LEN=40 PROTO=UDP SPT=5000 DPT=53',
+    'Sat Nov  7 10:00:05 2026 daemon.info dnsmasq[1]: query[A] example.com from 192.168.1.20',
+    'Nov  7 10:00:06 router kernel: [12349.000001] drop wan in: IN=eth1 OUT= SRC=198.51.100.11 DST=192.0.2.10 LEN=60 PROTO=TCP SPT=1 DPT=3389',
+  ].join('\n'));
+  assert.deepEqual(rows.map(r => [r.act, r.group, r.rule, r.src, r.dpt, r.iin, r.iout, r.host]), [
+    ['DROP', 0, 'wan_in', '203.0.113.5', 22, 'eth1', '', 'openwrt'],
+    ['REJECT', 0, 'lan_forward', '192.168.1.20', 25, 'br-lan', 'eth1', 'openwrt'],
+    ['DROP', 0, 'src_wan', '203.0.113.6', 23, 'eth0.2', '', 'openwrt'],
+    ['ACCEPT', 2, 'dest_wan', '192.168.1.20', 53, 'br-lan', 'eth0.2', 'openwrt'],
+    ['DROP', 0, 'wan_in', '198.51.100.11', 3389, 'eth1', '', 'router']]);
+  assert.equal(rows[0].ts, Date.UTC(2026, 10, 7, 10, 0, 1));
+  assert.equal(p.g('D.kinds.openwrt'), 1);
+});
+
+test('OpenWrt logread saved under the router\'s name shows that name', async () => {
+  const { rows } = await rowsOf('gl-ax1800.log', 'Sat Nov  7 10:00:01 2026 kern.warn kernel: [1.000001] drop wan in: IN=eth1 OUT= SRC=203.0.113.5 DST=192.0.2.10 LEN=60 PROTO=TCP SPT=1 DPT=22');
+  assert.equal(rows[0].host, 'gl-ax1800');
+});
+
+test('AWS VPC Flow Logs: default format, custom header, CloudWatch export', async () => {
+  const { rows } = await rowsOf('vpc.log', [
+    'version account-id interface-id srcaddr dstaddr srcport dstport protocol packets bytes start end action log-status',
+    '2 123456789012 eni-0a1b2c3d4e5f60718 203.0.113.5 192.0.2.10 40000 22 6 3 180 1794045600 1794045660 REJECT OK',
+    '2 123456789012 eni-0a1b2c3d4e5f60718 198.51.100.7 192.0.2.10 5353 443 6 10 4200 1794045610 1794045670 ACCEPT OK',
+    '2 123456789012 eni-0a1b2c3d4e5f60718 - - - - - - - 1794045620 1794045680 - NODATA',
+  ].join('\n'));
+  assert.deepEqual(rows.map(r => [r.act, r.group, r.src, r.dpt, r.proto, r.iin, r.host]), [
+    ['REJECT', 0, '203.0.113.5', 22, 'TCP', 'eni-0a1b2c3d4e5f60718', 'aws 123456789012'],
+    ['ACCEPT', 2, '198.51.100.7', 443, 'TCP', 'eni-0a1b2c3d4e5f60718', 'aws 123456789012']]);
+  assert.equal(rows[0].ts, 1794045600000);
+
+  const custom = await rowsOf('vpc-custom.log', [
+    '${vpc-id} ${srcaddr} ${dstaddr} ${srcport} ${dstport} ${protocol} ${start} ${action} ${flow-direction} ${interface-id}',
+    'vpc-0abc 203.0.113.9 192.0.2.10 1 3389 6 1794045600 REJECT ingress eni-1',
+    'vpc-0abc 192.0.2.10 198.51.100.9 50000 443 6 1794045601 ACCEPT egress eni-1',
+  ].join('\n'));
+  assert.deepEqual(custom.rows.map(r => [r.act, r.src, r.dpt, r.host, r.iin, r.iout]), [
+    ['REJECT', '203.0.113.9', 3389, 'vpc-0abc', 'eni-1', ''], ['ACCEPT', '192.0.2.10', 443, 'vpc-0abc', '', 'eni-1']]);
+
+  const cw = await rowsOf('cloudwatch.txt', '2026-11-07T10:00:00.000Z 2 123456789012 eni-0a1b2c3d4e5f60718 203.0.113.6 192.0.2.10 1 23 6 1 40 1794045600 1794045660 REJECT OK');
+  assert.deepEqual(cw.rows.map(r => [r.act, r.src, r.dpt]), [['REJECT', '203.0.113.6', 23]]);
+});
+
+test('Azure NSG and VNet flow logs: begin records and denies, rule names, the NSG as host', async () => {
+  const nsg = { records: [{ time: '2026-11-07T10:00:00Z', category: 'NetworkSecurityGroupFlowEvent', macAddress: '000D3AF87856',
+    resourceId: '/SUBSCRIPTIONS/00000000-0000-0000-0000-000000000000/RESOURCEGROUPS/RG/PROVIDERS/MICROSOFT.NETWORK/NETWORKSECURITYGROUPS/WEB-NSG',
+    properties: { Version: 2, flows: [
+      { rule: 'DefaultRule_DenyAllInBound', flows: [{ mac: '000D3AF87856', flowTuples: ['1794045600,203.0.113.5,10.0.0.4,40000,22,T,I,D,B,,,,'] }] },
+      { rule: 'UserRule_AllowHttps', flows: [{ mac: '000D3AF87856', flowTuples: ['1794045601,198.51.100.7,10.0.0.4,50000,443,T,I,A,B,,,,', '1794045660,198.51.100.7,10.0.0.4,50000,443,T,I,A,E,10,800,8,4000'] }] }] } }] };
+  const a = await rowsOf('PT1H.json', JSON.stringify(nsg, null, 2));
+  assert.deepEqual(a.rows.map(r => [r.act, r.group, r.rule, r.src, r.dpt, r.host, r.iin]), [
+    ['DENY', 0, 'DefaultRule_DenyAllInBound', '203.0.113.5', 22, 'web-nsg', 'inbound'],
+    ['ALLOW', 2, 'UserRule_AllowHttps', '198.51.100.7', 443, 'web-nsg', 'inbound']]);
+  assert.equal(a.rows[0].ts, 1794045600000);
+  assert.equal(a.p.g('ruleName("DefaultRule_DenyAllInBound")'), 'DefaultRule DenyAllInBound');
+
+  const vnet = { records: [{ time: '2026-11-07T10:00:00Z', flowLogVersion: 4, category: 'FlowLogFlowEvent', macAddress: '00224871C205',
+    targetResourceID: '/subscriptions/x/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/prod-vnet',
+    flowRecords: { flows: [{ aclID: 'x', flowGroups: [{ rule: 'BlockSSH', flowTuples: ['1794045600599,203.0.113.8,10.0.0.6,40000,22,6,I,D,NX,0,0,0,0', '1794045601000,10.0.0.6,198.51.100.180,23956,443,6,O,B,NX,0,0,0,0'] }] }] } }] };
+  const b = await rowsOf('PT1H.json', JSON.stringify(vnet));
+  assert.deepEqual(b.rows.map(r => [r.act, r.src, r.dpt, r.host, r.iout]), [['DENY', '203.0.113.8', 22, 'prod-vnet', ''], ['ALLOW', '10.0.0.6', 443, 'prod-vnet', 'outbound']]);
+  assert.equal(b.rows[0].ts, 1794045600599);
 });

@@ -222,3 +222,59 @@ test('remove one loaded file: the others are re-read as if it was never there', 
   assert.ok(p.g('BLOCKSEL.has("x")'), 'ticks kept');
   assert.match(p.g('$("#toast").textContent'), /^Removed a\.log\. 1 file loaded\./);
 });
+
+test('since your last visit: new sources, ports and newer events, compared with earlier visits', async () => {
+  const p = openPage();
+  await p.load('day1.log', LINES.slice(0, 2).join('\n'));
+  assert.equal(p.g('$("#sinceCard").hidden'), true, 'first visit: nothing to compare with');
+  const fp = JSON.parse(p.g('localStorage.getItem("fwscope-visit")'));
+  assert.ok(fp.src && !fp.src.includes('203.0.113'), 'addresses are stored hashed');
+  // a later visit, with a newer day
+  p.g('VISIT.prev = JSON.parse(localStorage.getItem("fwscope-visit"))');
+  await p.load('day2.log', [
+    LINES[0].replace('10:00:01', '11:00:01'),
+    'Nov  7 11:00:02 web kernel: [UFW BLOCK] IN=eth0 OUT= SRC=198.51.100.200 DST=192.0.2.10 LEN=60 PROTO=TCP SPT=1 DPT=3389',
+  ].join('\n'));
+  const v = JSON.parse(p.g('JSON.stringify({ after: VISIT.card.after, src: VISIT.card.src.map(([s, n]) => D.ip.list[s]), ports: VISIT.card.ports.map(([x]) => x) })'));
+  assert.deepEqual(v, { after: 2, src: ['198.51.100.200'], ports: [3389] });
+  assert.equal(p.g('$("#sinceCard").hidden'), false);
+  assert.match(p.g('$("#sinceBody").textContent'), /New sources \(1\)198\.51\.100\.200/);
+  p.g('$("#btnForgetVisits").click()');
+  assert.equal(p.g('localStorage.getItem("fwscope-visit")'), null);
+});
+
+test('the sample never counts as a visit', async () => {
+  const p = openPage({ url: 'http://localhost/?demo&tz=UTC' });
+  await until(() => p.g('typeof D !== "undefined" && D && D.n > 0 && D.order'));
+  assert.equal(p.g('localStorage.getItem("fwscope-visit")'), null);
+});
+
+test('a kept session comes back the same (snapshot, storage round trip, reopen)', async () => {
+  const p = openPage();
+  await p.load('ufw.log', LINES.join('\n'));
+  const before = p.g('F.preds = compileQuery("dpt:22"); filterRows(null).length');
+  p.w.__snap = structuredClone(p.g('sessionSnapshot()')); // what IndexedDB stores is a structured clone
+  assert.equal(p.g('__snap.files[0].src'), null, 'the file itself is not kept');
+  assert.equal(p.g('"order" in __snap || "ipc" in __snap'), false, 'derived lookups are rebuilt, not stored');
+  p.g('$("#btnClear").click()');
+  p.g('D = reviveStore(__snap); D.fresh = true; D.skipSave = true; finish()');
+  assert.deepEqual(p.errors, []);
+  assert.equal(p.g('D.n'), 5);
+  assert.equal(p.g('F.preds = compileQuery("dpt:22"); filterRows(null).length'), before);
+  assert.equal(p.g('D.ip.id("203.0.113.5")') > 0, true);
+});
+
+test('start screen: one format\'s steps at a time, and the open menu', () => {
+  const p = openPage();
+  const shown = () => [...p.w.document.querySelectorAll('.fmt-panel')].filter(x => !x.hidden).map(x => x.dataset.f);
+  assert.deepEqual(shown(), ['ufw']);
+  p.g('document.querySelector(".fmt-tabs [data-f=azure]").click()');
+  assert.deepEqual(shown(), ['azure']);
+  assert.equal(p.g('localStorage.getItem("fwscope-fmt")'), 'azure');
+  assert.equal(p.w.document.querySelectorAll('.fmt-tabs button').length, p.w.document.querySelectorAll('.fmt-panel').length, 'a panel for every tab');
+  p.g('$("#btnOpenMore").click()');
+  assert.equal(p.g('$("#openMenu").hidden'), false);
+  p.g('$("#btnPaste").click()');
+  assert.equal(p.g('$("#openMenu").hidden'), true);
+  assert.equal(p.g('$("#pasteDlg").open'), true);
+});

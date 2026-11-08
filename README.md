@@ -4,7 +4,7 @@
 
 [![tests](https://github.com/magikh0e/fwscope/actions/workflows/test.yml/badge.svg)](https://github.com/magikh0e/fwscope/actions/workflows/test.yml)
 
-A single-file, offline visualizer for firewall and WAF logs: UFW, nftables / iptables / firewalld, OPNsense / pfSense, Windows Firewall, fail2ban, Suricata, ModSecurity / Coraza, and Cloudflare firewall events. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box. The one exception is the optional hostname lookup, which is off unless you turn it on (see [Hostnames](#hostnames-reverse-dns)).
+A single-file, offline visualizer for firewall and WAF logs: UFW, nftables / iptables / firewalld, OPNsense / pfSense, Windows Firewall, OpenWrt, AWS VPC and Azure flow logs, fail2ban, Suricata, ModSecurity / Coraza, and Cloudflare firewall events. Open `index.html` in a browser, drop your logs on it, and you get a dashboard. Everything is parsed in the browser tab. Nothing gets uploaded, and there are no dependencies or CDN calls, so it also works on an air-gapped box. The one exception is the optional hostname lookup, which is off unless you turn it on (see [Hostnames](#hostnames-reverse-dns)).
 
 ![fwscope dashboard on a week of sample firewall and WAF logs: summary tiles, events over time split into firewall and WAF panels, a world map of sources with the top networks, and what blocking mode would do at each anomaly threshold](assets/screenshot.png)
 
@@ -21,7 +21,7 @@ A single-file, offline visualizer for firewall and WAF logs: UFW, nftables / ipt
 
 Lines that aren't firewall log lines are ignored, so you can feed it a whole `syslog`. Drop several files at once to merge them. You can also add files later: once logs are loaded, **Open logs** becomes **Add logs**, and dropping files on the dashboard adds them too. Each addition says how many new events it brought and how many duplicates were skipped. **Clear** starts over.
 
-- **Folders:** drop a whole folder (subfolders too), or use **Folder** to pick one. Hidden files and things that can't be logs (images, archives other than `.gz`, binaries) are skipped.
+- **Folders:** drop a whole folder (subfolders too), or pick one with **Open logs ▾ → Open a folder**. Hidden files and things that can't be logs (images, archives other than `.gz`, binaries) are skipped.
 - **Loaded files:** the card at the bottom of the dashboard lists each file with its events, duplicates and skipped lines. **Remove** takes one out by re-reading the others, so counts and duplicates come out as if it had never been loaded. Your view, filter and block ticks stay. UFW's default rsyslog config writes each line to `ufw.log`, `kern.log` *and* `syslog`, so a line that shows up again in a later file is skipped as a duplicate.
 
 ### Getting the logs
@@ -44,9 +44,24 @@ journalctl -k -g 'SRC=' -o short-iso --since '-7d' > netfilter.log
 
 firewalld logs refused packets after `firewall-cmd --set-log-denied=all`.
 
+### OpenWrt
+
+OpenWrt logs a zone's dropped and rejected packets once logging is on for that zone: in LuCI, Network → Firewall → edit the zone → Advanced settings → **Enable logging on this zone**, or `option log '1'` on the zone in `/etc/config/firewall`, then `service firewall restart`. Both firewall generations work:
+
+- **fw4** (nftables, OpenWrt 22.03 and later): prefixes like `drop wan in:` and `reject lan forward:`
+- **fw3** (iptables): prefixes like `DROP(src wan)` and `REJECT(dest wan)`, written right against the packet
+
+The verdict becomes the action (DROP, REJECT, ACCEPT) and the zone and direction become the rule, so the Rules list shows which zone logged what (`rule:wan_in`).
+
+```bash
+ssh root@openwrt 'logread' > gl-ax1800.log
+```
+
+`logread` keeps only a small in-memory buffer, and its lines carry no hostname: the file name is used, so name it after the router (a generic name like `logread.txt` shows as `openwrt`). For a longer history, send the log to a syslog server (System → System → Logging → External system log server) and load that file instead; those lines carry the router's hostname.
+
 ### fail2ban
 
-fail2ban's own log (`/var/log/fail2ban.log`) shows what it found, banned and unbanned. Each line becomes an event: **F2B BAN** (blocks, including `Restore Ban` after a restart), **F2B FOUND** (a matched failure, in the AUDIT group) or **F2B UNBAN** (allowed group). The jail (`sshd`, `nginx-botsearch` …) shows as the rule, so the Rules list and `rule:sshd` work. Load it alongside the firewall or WAF logs to see which attackers fail2ban caught and which it missed:
+fail2ban's own log (`/var/log/fail2ban.log`) shows what it found, banned and unbanned. Each line becomes an event: **F2B BAN** (blocks, including `Restore Ban` after a restart), **F2B FOUND** (a matched failure, in the AUDIT group), **F2B REPEAT** (fail2ban's `already banned` warning: the address showed up again while banned, so the ban isn't keeping it out) or **F2B UNBAN** (allowed group). Lots of repeats on one jail usually mean its ban action doesn't block that traffic, for example a rule that allows the port comes first, or the visitors arrive through a proxy or CDN. The jail (`sshd`, `nginx-botsearch` …) shows as the rule, so the Rules list and `rule:sshd` work. Load it alongside the firewall or WAF logs to see which attackers fail2ban caught and which it missed:
 
 - the **Scans** card marks each scanner or hammerer **fail2ban banned** or **not banned** (a missed one usually means no jail covers that service)
 - **Block suggestions** say the same in their reasons
@@ -156,6 +171,29 @@ Click any row or cell to filter on it. Clicking another value of the same kind (
 Lists that would be empty for the loaded logs are greyed out in the menus. Once you pick a list or window yourself, it stays, unless it can't show anything for the next set of logs.
 
 **Saved views.** Everything you set is saved in the page address, e.g. `index.html#q=dpt:22&t=7d&n=1&d=src,cc,asn`. That covers the filter, time range, action toggles, checkboxes and which lists the Top cards show. Bookmark that address and it opens the same view on whatever logs you load. The browser also remembers your last view for next time, apart from a zoomed time range, which rarely fits the next set of logs. **Reset view** clears it all.
+
+## Cloud flow logs
+
+### AWS VPC Flow Logs
+
+The text records as delivered to S3 (`.log.gz`, with a header line) or exported from CloudWatch Logs (a timestamp in front of each record). The default version 2 format and custom formats both work: the header line names the fields. Records without data (`NODATA`, `SKIPDATA`) are skipped.
+
+- **Actions:** ACCEPT and REJECT.
+- **Interface:** the network interface (`eni-...`), inbound, or outbound when the format includes `flow-direction` and it says `egress`.
+- **Host:** the VPC when the format includes `vpc-id`, otherwise the account.
+- `pkt-srcaddr`, when present, is used as the source (the original client behind a NAT gateway or load balancer).
+
+```bash
+aws s3 sync s3://YOUR-BUCKET/AWSLogs/ACCOUNT/vpcflowlogs/REGION/2026/11/07/ ./vpc/
+```
+
+### Azure NSG and VNet flow logs
+
+The hourly `PT1H.json` blobs from the flow logs storage account: `insights-logs-networksecuritygroupflowevent` (NSG flow logs, versions 1 and 2) or `insights-logs-flowlogflowevent` (VNet flow logs, which replace them).
+
+- Each flow counts once: its begin record, or its single deny record. Continuation and end records would count the same flow again.
+- **Actions:** ALLOW and DENY. The NSG rule (`DefaultRule_DenyAllInBound`, `UserRule_AllowHttps`) is the rule.
+- **Host:** the NSG or virtual network, from the resource ID. The NIC's MAC address is kept.
 
 ## Suricata (IDS / IPS)
 
@@ -274,6 +312,7 @@ The header emblem and favicon are drawn from that same map by `tools/build-logo.
 
 A busy firewall writes a lot: one real OPNsense box here logs about 850K events (200 MB) a day. The page handles that in a few ways:
 
+- **Remember last load:** after real logs load, the parsed events (not the files) are kept in this browser, and the start screen offers to **Reopen** them next time. A day of OPNsense logs (1 million events) reopens in under half a second instead of being parsed again. Untick **Remember last load** under the header to turn it off, or **Forget it** on the start screen. It's kept on this computer only. A reopened session can't remove single files, since the files themselves aren't kept.
 - **Background parsing:** files are read in a background worker, so the page stays responsive while a big load runs and **Stop** takes effect at once. (A 245 MB, one-million-event OPNsense day loads in about 3 seconds here; the page never pauses for more than a few hundredths of a second.) If a browser refuses to start the worker, parsing falls back to the page itself.
 - **Load options**, under the header, apply to files you load next. Skipped events never take up memory:
   - **Skip LAN chatter** drops multicast, broadcast, IGMP and IPv6 neighbor discovery.
@@ -329,6 +368,15 @@ Traffic your firewall already drops isn't a reason to block anything, so firewal
 Behind Cloudflare the jails use fail2ban's `cloudflare-token` action, since a local ban wouldn't stop proxied requests, and note that your error log has to show the visitor's real address.
 
 Every script starts with the date and the number of entries, and has its undo script at the bottom, commented out. Review the list first: blocking a shared address (a VPN exit, a carrier NAT, a cloud range) can shut out real people.
+
+## Since your last visit
+
+Each time you load real logs, the page leaves a small fingerprint in this browser: hashed source addresses (not the addresses themselves), the destination ports that were blocked, attack types, rules, countries, and the newest event time. Next time, the **Since your last visit** card lists what's new compared with every earlier visit:
+
+- events newer than what you saw last time, with a button to show just those
+- new sources, newly targeted ports, new attack types, new rules and new countries, busiest first; click one to filter, shift-click to exclude
+
+It remembers up to 100,000 sources. The sample data doesn't count as a visit. **Forget history** on the card clears it.
 
 ## Blocklists
 

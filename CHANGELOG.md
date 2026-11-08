@@ -2,6 +2,19 @@
 
 What changed in each release of fwscope. The newest is at the top. Version numbers follow [semantic versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+- **OpenWrt:** firewall logs from `logread` or a syslog server, fw4 (`drop wan in:`) and fw3 (`DROP(src wan)`). The verdict is the action and the zone the rule.
+- **AWS VPC Flow Logs:** default and custom formats from S3, and CloudWatch exports.
+- **Azure flow logs:** NSG flow logs and VNet flow logs (`PT1H.json`), each flow counted once.
+- **Reopen your last session:** the parsed events of your last load are kept in this browser and reopen in a moment, without reading the files again. Turn it off with **Remember last load**.
+- **fail2ban repeats:** `already banned` warnings show as **F2B REPEAT**: an address that came back while banned, a sign the ban action isn't stopping it.
+- **Since your last visit:** a card listing new sources, newly targeted ports, attack types, rules and countries since earlier visits, and the events newer than what you last saw.
+
+### Changed
+- **A shorter start screen:** the drop zone is down to a few lines, with a **Try it on sample data** button. The setup help shows one log format at a time (and remembers which), with turning logging on and grabbing the log in one place. GeoIP, rule names and blocklists fold away under **Optional extras**. **Folder** and **Paste** moved into a menu on **Open logs**.
+
 ## 1.2.0 (2026-11-08)
 
 ### Added

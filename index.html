@@ -70,11 +70,27 @@ header.top h1 span { color: var(--muted); font-weight: 400; }
 .stack { display: grid; gap: 14px; padding-bottom: 40px; }
 
 /* empty state */
-#drop { border: 2px dashed var(--axis); border-radius: 12px; padding: 36px 20px; text-align: center; background: var(--surface); }
+#drop { border: 2px dashed var(--axis); border-radius: 12px; padding: 28px 20px; text-align: center; background: var(--surface); }
+#drop .fmt-list { font-size: 13px; color: var(--ink-2); max-width: 760px; margin: 0 auto 8px; }
+#drop .muted, .extras .muted { color: var(--muted); }
+.extras { margin-top: 14px; }
+.extras summary { cursor: pointer; }
+.extras p { color: var(--ink-2); margin: 8px 0 0; }
+.fmt-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.fmt-tabs button { font-size: 12.5px; padding: 4px 10px; border-radius: 14px; }
+.fmt-tabs button[aria-selected="true"] { background: var(--accent); border-color: transparent; color: #fff; }
+.fmt-panel h3:first-child { margin-top: 4px; }
+.fmt-panel .step { color: var(--ink-2); margin: 4px 0; }
+.howto details.more summary { cursor: pointer; color: var(--ink-2); font-size: 12.5px; margin-top: 8px; }
+.split { position: relative; display: inline-flex; }
+.split > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.split > .caret { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid rgba(255,255,255,.35); padding: 5px 8px; }
+.menu { position: absolute; top: calc(100% + 4px); left: 0; z-index: 40; display: flex; flex-direction: column; min-width: 180px; background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.menu[hidden] { display: none; }
+.menu button { border: 0; text-align: left; border-radius: 5px; }
 #drop.over { border-color: var(--accent); background: var(--surface-2); }
 #drop p { color: var(--ink-2); margin: 6px 0; }
-.howto { margin-top: 18px; display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
-@media (max-width: 860px) { .howto { grid-template-columns: 1fr; } }
+.howto { margin-top: 14px; }
 .howto pre { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; font: 12px/1.5 var(--mono); }
 .howto ul { margin: 6px 0; padding-left: 18px; color: var(--ink-2); }
 #drop code, .howto code { overflow-wrap: anywhere; }
@@ -241,6 +257,12 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
 .files summary { cursor: pointer; }
 .files td.num { text-align: right; }
 #dash.busy { opacity: .55; transition: opacity .2s; }
+.session { margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.session #sessionText { color: var(--ink-2); flex: 1 1 260px; }
+.since-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.since-label { font-size: 13px; color: var(--ink-2); min-width: 190px; }
+.since-more { font-size: 12px; color: var(--muted); }
+.chip-btn { font-size: 12px; padding: 2px 9px; border-radius: 10px; font-family: inherit; }
 .credit { color: var(--muted); font-size: 12px; text-align: center; margin: 8px 0 24px; }
 .credit a { color: inherit; }
 [hidden] { display: none !important; }
@@ -251,10 +273,9 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
   <header class="top">
     <h1><!--LOGO--><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="logo" aria-hidden="true" focusable="false"><path fill="var(--accent)" d="M42.36 25.05a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M45.26 25.05a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M51.06 25.05a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M27.86 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M30.76 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M33.66 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M36.56 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M51.06 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M53.96 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M56.86 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M59.76 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M62.66 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M65.56 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M68.46 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M71.36 27.95a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M27.86 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M30.76 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M33.66 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M36.56 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M51.06 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M53.96 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M56.86 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M59.76 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M62.66 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M65.56 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M68.46 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M71.36 30.85a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M27.86 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M30.76 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M48.16 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M51.06 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M56.86 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M59.76 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M62.66 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M65.56 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M68.46 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M71.36 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M74.26 33.75a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M27.86 36.65a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M48.16 36.65a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M51.06 36.65a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M53.96 36.65a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M59.76 36.65a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M65.56 36.65a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M68.46 36.65a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M71.36 36.65a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M48.16 39.55a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M51.06 39.55a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M53.96 39.55a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M56.86 39.55a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M65.56 39.55a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M71.36 39.55a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M33.66 42.45a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M36.56 42.45a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M51.06 42.45a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M53.96 42.45a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M56.86 42.45a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M33.66 45.35a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M36.56 45.35a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M39.46 45.35a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M53.96 45.35a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M56.86 45.35a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M74.26 45.35a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M80.06 45.35a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M36.56 48.25a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M39.46 48.25a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M53.96 48.25a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M74.26 48.25a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M77.16 48.25a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M36.56 51.15a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M53.96 51.15a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M74.26 51.15a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M77.16 51.15a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0M36.56 54.05a0.99 0.99 0 1 0 1.97 0a0.99 0.99 0 1 0 -1.97 0"/><path fill="var(--logo-ring)" d="M17.9 65h9.7v5h-9.7zM29.2 65h10v5h-10zM40.8 65h10v5h-10zM52.4 65h10v5h-10zM64 65h10v5h-10zM75.6 65h6.5v5h-6.5zM23.4 71.6h10v5h-10zM35 71.6h10v5h-10zM46.6 71.6h10v5h-10zM58.2 71.6h10v5h-10zM69.8 71.6h7.23v5h-7.23zM31.31 78.2h7.89v5h-7.89zM40.8 78.2h10v5h-10zM52.4 78.2h10v5h-10zM64 78.2h4.69v5h-4.69z"/><path stroke="var(--logo-ring)" stroke-width="0.9" fill="none" d="M24 50H76M50 24V76M29 48.4v3.2M48.4 29h3.2M36 48.4v3.2M48.4 36h3.2M43 48.4v3.2M48.4 43h3.2M57 48.4v3.2M48.4 57h3.2M64 48.4v3.2M48.4 64h3.2M71 48.4v3.2M48.4 71h3.2"/><path stroke="var(--logo-ring)" stroke-width="4.2" stroke-linecap="butt" fill="none" d="M50 8V24M50 76V92M8 50H24M76 50H92"/><circle cx="36.22" cy="31.88" r="3.6" fill="var(--a-block)" opacity="0.3"/><circle cx="36.22" cy="31.88" r="2" fill="var(--a-block)"/><circle cx="51.52" cy="29.71" r="3.6" fill="var(--a-block)" opacity="0.3"/><circle cx="51.52" cy="29.71" r="2" fill="var(--a-block)"/><circle cx="71.78" cy="32.05" r="3.6" fill="var(--a-block)" opacity="0.3"/><circle cx="71.78" cy="32.05" r="2" fill="var(--a-block)"/><circle cx="40.55" cy="49.51" r="3.6" fill="var(--a-block)" opacity="0.3"/><circle cx="40.55" cy="49.51" r="2" fill="var(--a-block)"/><circle cx="71.91" cy="42.54" r="3.6" fill="var(--a-block)" opacity="0.3"/><circle cx="71.91" cy="42.54" r="2" fill="var(--a-block)"/><circle cx="31.12" cy="33.82" r="3.6" fill="var(--a-block)" opacity="0.3"/><circle cx="31.12" cy="33.82" r="2" fill="var(--a-block)"/><circle cx="50" cy="29.38" r="3.6" fill="var(--a-block)" opacity="0.3"/><circle cx="50" cy="29.38" r="2" fill="var(--a-block)"/><circle cx="56.23" cy="28.47" r="3.6" fill="var(--a-block)" opacity="0.3"/><circle cx="56.23" cy="28.47" r="2" fill="var(--a-block)"/><circle cx="50" cy="50" r="42" fill="none" stroke="var(--logo-ring)" stroke-width="5"/><path d="M50 8A42 42 0 0 1 50 92" fill="none" stroke="var(--logo-hi)" stroke-width="5"/></svg><!--END-LOGO-->fwscope <span>// firewall &amp; WAF log visualizer</span></h1>
     <input type="file" id="file" multiple hidden>
-    <button class="primary" id="btnOpen">Open logs</button>
     <input type="file" id="folder" webkitdirectory multiple hidden>
-    <button id="btnFolder" title="Open every log file in a folder (subfolders included)">Folder</button>
-    <button id="btnPaste">Paste</button>
+    <span class="split"><button class="primary" id="btnOpen">Open logs</button><button class="primary caret" id="btnOpenMore" aria-haspopup="menu" aria-expanded="false" aria-label="More ways to open logs" title="Open a folder, or paste log lines">▾</button>
+      <span class="menu" id="openMenu" role="menu" hidden><button role="menuitem" id="btnFolder">Open a folder…</button><button role="menuitem" id="btnPaste">Paste log lines…</button></span></span>
     <button id="btnSample">Sample data</button>
     <button id="btnReport" hidden title="Save the current view as a standalone HTML report (charts and lists, no raw events)">Save report</button>
     <button id="btnClear" hidden>Clear</button>
@@ -265,6 +286,7 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
     <span>When loading:</span>
     <label class="tog" title="Skips multicast, broadcast and IPv6 neighbor discovery while loading"><input type="checkbox" id="optChatter"> Skip LAN chatter <span class="muted">(multicast, broadcast, IPv6 neighbor discovery)</span></label>
     <label class="tog" title="Skips ALLOW / PASS events while loading"><input type="checkbox" id="optBlocks"> Blocks only <span class="muted">(skip ALLOW / PASS)</span></label>
+    <label class="tog" title="Keep the parsed events of your last load in this browser, so the next visit can reopen it without reading the files again. Stays on this computer."><input type="checkbox" id="optRemember"> Remember last load</label>
     <label class="tog" title="Classic syslog, dmesg -T and Windows Firewall logs don't record a timezone. Pick the zone the logging machine was set to. Logs with a timezone (ISO, journal, OPNsense) aren't affected.">Logs without a timezone are in
       <select id="optTz"></select></label>
     <span id="tzNote" hidden>Applies to logs you load next: Clear and reload the files to re-read them in that zone.</span>
@@ -272,109 +294,155 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
   <div id="progress"><span id="progText">Reading…</span> <button id="btnStop" title="Stop reading and keep what's loaded so far">Stop</button><div class="bar"><div id="progBar"></div></div></div>
 
   <section id="empty">
-    <div id="drop">
-      <h2 style="margin:0 0 6px">Drop firewall or WAF logs here</h2>
-      <p>Firewalls: UFW, nftables / iptables / firewalld, OPNsense / pfSense, Windows Firewall, plus fail2ban's log and Suricata IDS alerts. Web application firewalls: ModSecurity, Coraza and Cloudflare firewall events.</p>
-      <p>Windows: <code>pfirewall.log</code> (copy it out from an admin prompt first).</p>
-      <p>ModSecurity: the audit log (<code>modsec_audit.log</code>, JSON or native format) or the <code>ModSecurity:</code> lines in an Apache or nginx error log.</p>
-      <p>OPNsense / pfSense: <code>/var/log/filter/filter_*.log</code>, remote-syslog copies, or Live View API JSON.</p>
-      <p>Plain <code>ufw.log</code>, rotated <code>.gz</code> files, <code>kern.log</code>/<code>syslog</code>, <code>dmesg -T</code> or <code>journalctl</code> output (text or <code>-o json</code>).</p>
-      <p>Drop several at once, or a whole folder, to merge them. Add more later with <b>Add logs</b> or by dropping them on the dashboard. Duplicates across files are skipped (UFW writes the same line to ufw.log, kern.log and syslog).</p>
-      <p>For a world map and network owners, drop a GeoIP database too (<code>.mmdb</code> or <code>.mmdb.gz</code>). <span id="geoStatusEmpty"></span></p>
-      <p>Blocklists: drop a plain list of addresses and ranges (Spamhaus DROP, FireHOL <code>.netset</code>, your own) to mark sources on it. Checked here, never looked up online. <span id="blistStatusEmpty"></span></p>
-      <p>OPNsense / pfSense: drop a config backup (<code>config-*.xml</code>) and/or <code>rule_ids.json</code> to show interface and rule names. <span id="namesStatusEmpty"></span></p>
-      <p style="color:var(--muted)">Everything is parsed in this browser tab. Nothing is uploaded anywhere, unless you turn on the optional hostname lookups.</p>
+    <div class="card session" id="sessionBox" hidden>
+      <b>Your last session</b> <span id="sessionText"></span>
+      <button class="primary" id="btnReopen">Reopen</button> <button id="btnForget">Forget it</button>
     </div>
-    <div class="howto">
-      <div class="card">
-        <h2>Grab the logs</h2>
-        <h3>UFW / iptables</h3>
+    <div id="drop">
+      <h2 style="margin:0 0 8px">Drop firewall or WAF logs here</h2>
+      <p class="fmt-list">UFW · nftables · OpenWrt · OPNsense / pfSense · Windows Firewall · AWS VPC · Azure · fail2ban · Suricata · ModSecurity / Coraza · Cloudflare</p>
+      <p>Files, a whole folder or rotated <code>.gz</code> logs. Several at once are merged and repeated lines skipped; add more any time.</p>
+      <p><button id="btnTry">Try it on sample data</button></p>
+      <p class="muted">Everything is parsed in this browser tab. Nothing is uploaded anywhere, unless you turn on the optional hostname lookups.</p>
+    </div>
+    <details class="card extras" id="extras">
+      <summary><b>Optional extras</b> <span class="muted">world map and network owners, OPNsense rule names, blocklists</span></summary>
+      <p><b>GeoIP database</b>: drop a <code>.mmdb</code> (or <code>.mmdb.gz</code>) country and/or ASN database for the world map and network owners. It's kept in this browser. <span id="geoStatusEmpty"></span></p>
+      <p><b>OPNsense / pfSense names</b>: drop a config backup (<code>config-*.xml</code>) and/or <code>rule_ids.json</code> to show interface and rule names instead of IDs. Only the names are kept. <span id="namesStatusEmpty"></span></p>
+      <p><b>Blocklists</b>: drop a plain list of addresses and ranges (Spamhaus DROP, a FireHOL <code>.netset</code>, your own) to mark sources on it. Checked here, never looked up online. <span id="blistStatusEmpty"></span></p>
+    </details>
+    <div class="card howto">
+      <h2>Get your logs</h2>
+      <div class="fmt-tabs" role="tablist" aria-label="Log format">
+        <button role="tab" data-f="ufw">UFW</button><button role="tab" data-f="nft">nftables / iptables</button><button role="tab" data-f="openwrt">OpenWrt</button><button role="tab" data-f="opnsense">OPNsense / pfSense</button><button role="tab" data-f="windows">Windows</button><button role="tab" data-f="aws">AWS VPC</button><button role="tab" data-f="azure">Azure</button><button role="tab" data-f="f2b">fail2ban</button><button role="tab" data-f="suricata">Suricata</button><button role="tab" data-f="modsec">ModSecurity</button><button role="tab" data-f="cloudflare">Cloudflare</button>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="ufw">
+        <h3>1. Turn logging on</h3>
+        <ul>
+          <li><code>sudo ufw logging low</code>: blocked packets that hit the default policy, plus rate-limited (LIMIT) ones.</li>
+          <li><code>medium</code> adds allowed new connections (ALLOW) and invalid packets. <code>high</code> / <code>full</code> add AUDIT lines and are noisy.</li>
+          <li>Per rule: <code>ufw allow log 22/tcp</code> or <code>ufw deny log-all ...</code></li>
+        </ul>
+        <h3>2. Grab the log</h3>
         <pre>sudo cp /var/log/ufw.log* ~/ &amp;&amp; sudo chown $USER ~/ufw.log*</pre>
         <pre>journalctl -k -g 'UFW ' -o short-iso --since '-7d' &gt; ufw-journal.log</pre>
-        <pre>journalctl -k -g 'UFW ' -o json &gt; ufw.json</pre>
         <pre>scp you@server:'~/ufw.log*' .</pre>
-        <h3>nftables / iptables / firewalld</h3>
-        <pre>journalctl -k -g 'SRC=' -o short-iso --since '-7d' &gt; netfilter.log</pre>
+        <ul><li>Also fine: <code>kern.log</code>, <code>syslog</code>, <code>dmesg -T</code> and <code>journalctl -o json</code>. UFW writes each line to three of those files; the copies are skipped.</li></ul>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="nft" hidden>
+        <h3>1. Turn logging on</h3>
         <ul>
-          <li>Any kernel log line with <code>SRC=</code>, <code>DST=</code> and <code>PROTO=</code> works. Its log prefix becomes the action: <code>nft-drop:</code>, <code>FINAL_REJECT:</code>, <code>IPTables-Dropped:</code>.</li>
-          <li>Prefixes that say drop, reject, deny or block count as blocks; accept, allow or pass as allowed; anything else as logged.</li>
-          <li>firewalld: <code>firewall-cmd --set-log-denied=all</code> turns logging of refused packets on.</li>
+          <li>nftables: add <code>log prefix "nft-drop: "</code> before the drop in a rule.</li>
+          <li>iptables: a <code>-j LOG --log-prefix "IPTables-Dropped: "</code> rule before the DROP.</li>
+          <li>firewalld: <code>firewall-cmd --set-log-denied=all</code></li>
         </ul>
-        <h3>fail2ban</h3>
-        <pre>sudo cp /var/log/fail2ban.log* ~/ &amp;&amp; sudo chown $USER ~/fail2ban.log*</pre>
-        <ul><li>Ban, Unban and Found lines; the jail shows as the rule. Load it with the web or firewall logs to see who fail2ban caught.</li></ul>
-        <h3>Suricata (IDS / IPS)</h3>
-        <pre>scp 'root@opnsense:/var/log/suricata/eve.json*' .</pre>
-        <ul><li>Alerts from <code>eve.json</code> (other event types are skipped) or <code>fast.log</code>. The signature shows as the rule; <code>seen:ids</code> filters to sources Suricata alerted on.</li></ul>
-        <h3>OPNsense / pfSense</h3>
+        <h3>2. Grab the log</h3>
+        <pre>journalctl -k -g 'SRC=' -o short-iso --since '-7d' &gt; netfilter.log</pre>
+        <ul><li>Any kernel line with <code>SRC=</code>, <code>DST=</code> and <code>PROTO=</code> works. The prefix becomes the action: drop, reject, deny or block count as blocks; accept, allow or pass as allowed; anything else as logged.</li></ul>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="openwrt" hidden>
+        <h3>1. Turn logging on</h3>
+        <ul><li>Network → Firewall → edit the zone → Advanced settings → <b>Enable logging on this zone</b> (or <code>option log '1'</code> in <code>/etc/config/firewall</code>), then restart the firewall.</li></ul>
+        <h3>2. Grab the log</h3>
+        <pre>ssh root@openwrt 'logread' &gt; openwrt.log</pre>
+        <ul>
+          <li>fw4 (22.03+) and fw3 lines both work. The verdict becomes the action and the zone the rule (<code>wan in</code>, <code>src wan</code>).</li>
+          <li><code>logread</code> keeps only a small buffer. For history, send the log to a syslog server (System → System → Logging) and load that.</li>
+          <li><code>logread</code> lines have no hostname: name the file after the router (<code>gl-ax1800.log</code>).</li>
+        </ul>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="opnsense" hidden>
+        <h3>1. Turn logging on</h3>
+        <ul>
+          <li>Each rule logs only if its <b>Log</b> box is ticked (Firewall → Rules → edit the rule).</li>
+          <li>The built-in default block and pass rules have their own switches under Firewall → Settings.</li>
+        </ul>
+        <h3>2. Grab the log</h3>
         <pre>scp 'root@opnsense:/var/log/filter/filter_*.log' .</pre>
         <pre>ssh root@opnsense 'cat /var/log/filter/latest.log' &gt; opnsense-today.log</pre>
         <ul>
-          <li>Web UI: Firewall → Log Files → Plain View, then the download icon at the top right of the table.</li>
-          <li>SSH is off by default: System → Settings → Administration → Secure Shell.</li>
-          <li>One file per day; a busy firewall writes a few hundred MB a day. Drop a day or two at a time, or gzip them first (<code>gzip filter_*.log</code>).</li>
-          <li>Logs sent to a remote syslog server work too.</li>
+          <li>Or Firewall → Log Files → Plain View → the download icon. SSH is off by default (System → Settings → Administration).</li>
+          <li>One file per day, a few hundred MB on a busy firewall. Remote-syslog copies and Live View API JSON work too.</li>
+          <li>Rules and interfaces show as IDs until you drop a config backup: see <b>Optional extras</b> above.</li>
         </ul>
-        <h3>Windows Firewall</h3>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="windows" hidden>
+        <h3>1. Turn logging on</h3>
         <pre>Set-NetFirewallProfile -All -LogBlocked True -LogMaxSizeKilobytes 32767</pre>
+        <ul><li>In an admin PowerShell. <code>-LogAllowed True</code> adds allowed connections, which is very noisy on a desktop.</li></ul>
+        <h3>2. Grab the log</h3>
         <pre>Copy-Item C:\Windows\System32\LogFiles\Firewall\pfirewall.log* $HOME\Desktop\</pre>
         <ul>
-          <li>Run both in an admin PowerShell. Logging is off by default; the first line turns on logging of dropped packets.</li>
-          <li>Rename each copy after its PC (<code>office-pc.log</code>): the log has no hostname, so the file name is used.</li>
+          <li>Rename each copy after its PC (<code>office-pc.log</code>): the log has no hostname. Times are local, so read it in the PC's timezone.</li>
+          <li>No interface, rule or TTL is logged; direction shows as <code>receive</code> or <code>send</code>.</li>
         </ul>
-        <p style="margin:8px 0 4px">For <b>program names</b>, export the Security log's firewall events instead (needs auditing on, first line):</p>
-        <pre>auditpol /set /subcategory:"Filtering Platform Connection" /success:enable /failure:enable</pre>
-        <pre>Get-WinEvent -FilterHashtable @{LogName='Security';Id=5152,5156,5157} -MaxEvents 200000 | % { $x=[xml]$_.ToXml(); $d=[ordered]@{EventID=$_.Id;TimeCreated=$_.TimeCreated.ToUniversalTime().ToString('o');Computer=$_.MachineName}; $x.Event.EventData.Data | % { $d[$_.Name]=$_.'#text' }; $d | ConvertTo-Json -Compress } | Set-Content -Encoding utf8 "$HOME\Desktop\$env:COMPUTERNAME-wfp.json"</pre>
-        <h3>ModSecurity / Coraza</h3>
+        <details class="more"><summary>Program names (from the Security log)</summary>
+          <pre>auditpol /set /subcategory:"Filtering Platform Connection" /success:enable /failure:enable</pre>
+          <pre>Get-WinEvent -FilterHashtable @{LogName='Security';Id=5152,5156,5157} -MaxEvents 200000 | % { $x=[xml]$_.ToXml(); $d=[ordered]@{EventID=$_.Id;TimeCreated=$_.TimeCreated.ToUniversalTime().ToString('o');Computer=$_.MachineName}; $x.Event.EventData.Data | % { $d[$_.Name]=$_.'#text' }; $d | ConvertTo-Json -Compress } | Set-Content -Encoding utf8 "$HOME\Desktop\$env:COMPUTERNAME-wfp.json"</pre>
+        </details>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="aws" hidden>
+        <h3>1. Turn logging on</h3>
+        <ul><li>VPC console → your VPC (or a subnet or network interface) → Flow logs → Create flow log, with an S3 bucket as the destination. The default format is fine.</li></ul>
+        <h3>2. Grab the log</h3>
+        <pre>aws s3 sync s3://YOUR-BUCKET/AWSLogs/ACCOUNT/vpcflowlogs/REGION/2026/11/07/ ./vpc/</pre>
+        <ul><li>The <code>.log.gz</code> files as delivered (default or custom format), or a CloudWatch Logs export. ACCEPT and REJECT become the actions.</li></ul>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="azure" hidden>
+        <h3>1. Turn logging on</h3>
+        <ul><li>Network Watcher → Flow logs → Create, for a virtual network (VNet flow logs) or a network security group (NSG flow logs), with a storage account as the destination.</li></ul>
+        <h3>2. Grab the log</h3>
+        <pre>az storage blob download-batch -d ./azure -s insights-logs-flowlogflowevent --account-name YOUR_ACCOUNT</pre>
+        <ul><li>The hourly <code>PT1H.json</code> blobs. NSG flow logs live in <code>insights-logs-networksecuritygroupflowevent</code>. Each flow counts once, with the NSG rule as the rule.</li></ul>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="f2b" hidden>
+        <h3>Grab the log</h3>
+        <pre>sudo cp /var/log/fail2ban.log* ~/ &amp;&amp; sudo chown $USER ~/fail2ban.log*</pre>
+        <ul>
+          <li>Ban, Unban, Found and "already banned" (F2B REPEAT) lines; the jail shows as the rule.</li>
+          <li>Load it with your firewall or WAF logs: scanners get marked <b>fail2ban banned</b> or <b>not banned</b>, and <code>seen:f2b</code> filters to the ones it banned.</li>
+        </ul>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="suricata" hidden>
+        <h3>1. Turn logging on</h3>
+        <ul><li>Alerts go to <code>eve.json</code> by default. On OPNsense: Services → Intrusion Detection → Administration → <b>Enabled</b>, with rule sets downloaded.</li></ul>
+        <h3>2. Grab the log</h3>
+        <pre>scp 'root@opnsense:/var/log/suricata/eve.json*' .</pre>
+        <ul><li>Alert events from <code>eve.json</code> (the rest are skipped) or <code>fast.log</code>. The signature shows as the rule; IPS drops count as blocks; <code>seen:ids</code> filters to sources Suricata alerted on.</li></ul>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="modsec" hidden>
+        <h3>1. Turn logging on</h3>
+        <ul><li><code>SecAuditEngine RelevantOnly</code> (the usual setting) logs requests that tripped a rule. <code>SecAuditLogFormat JSON</code> and the default native format both work.</li></ul>
+        <h3>2. Grab the log</h3>
         <pre>scp 'you@web:/var/log/modsec_audit.log*' .</pre>
         <pre>grep 'ModSecurity:' /var/log/nginx/error.log &gt; modsec-errors.log</pre>
         <ul>
-          <li>The audit log path is set by <code>SecAuditLog</code>. The JSON format (<code>SecAuditLogFormat JSON</code>) and the default native format both work.</li>
-          <li>Apache and nginx error logs work too: each request's <code>ModSecurity:</code> lines are grouped by their <code>unique_id</code>.</li>
-          <li>Name a file after its server (<code>shop-web.log</code>) to tell servers apart.</li>
+          <li>The audit log path is set by <code>SecAuditLog</code>. Apache and nginx error-log lines work too, grouped per request.</li>
+          <li>Stopped requests show as <b>WAF BLOCK</b>, flagged ones as <b>WAF DETECT</b>. Attack types come from the OWASP Core Rule Set's rule numbers.</li>
+          <li>Name a file after its server (<code>shop-web.log</code>). Load firewall logs too and addresses seen by both get marked <b>firewall + WAF</b> (<code>seen:both</code>).</li>
         </ul>
-        <h3>Cloudflare</h3>
-        <p style="margin:4px 0">Security events from the GraphQL API, with an API token that can read Analytics (set your zone ID and start time):</p>
+      </div>
+
+      <div class="fmt-panel" role="tabpanel" data-f="cloudflare" hidden>
+        <h3>Grab the events</h3>
+        <p class="step">From the GraphQL API, with a token that can read Analytics (set your zone ID and start time):</p>
         <pre>curl -s https://api.cloudflare.com/client/v4/graphql -H "Authorization: Bearer $CF_API_TOKEN" -d '{"query":"{viewer{zones(filter:{zoneTag:\"ZONE_ID\"}){firewallEventsAdaptive(limit:10000,orderBy:[datetime_ASC],filter:{datetime_gt:\"2026-11-01T00:00:00Z\"}){action source ruleId description clientIP clientRequestHTTPHost clientRequestHTTPMethodName clientRequestPath clientRequestQuery userAgent edgeResponseStatus datetime rayName}}}}"}' &gt; cf-events.json</pre>
         <ul>
-          <li>Or a Logpush job for the <code>firewall_events</code> dataset (one JSON object per line).</li>
-          <li>Blocks, challenges, logged and skipped events show as <code>WAF BLOCK</code>, <code>WAF CHALLENGE</code>, <code>WAF DETECT</code> and <code>WAF ALLOW</code>, grouped by the Cloudflare product that acted.</li>
-          <li>How far back the API goes depends on your plan; it returns at most 10,000 events per query.</li>
+          <li>Or a Logpush job for the <code>firewall_events</code> dataset.</li>
+          <li>Blocks, challenges, logged and skipped events show as <code>WAF BLOCK</code>, <code>WAF CHALLENGE</code>, <code>WAF DETECT</code> and <code>WAF ALLOW</code>. The API returns at most 10,000 events per query; how far back depends on your plan.</li>
         </ul>
       </div>
-      <div class="card">
-        <h2>What gets logged</h2>
-        <h3>UFW</h3>
-        <ul>
-          <li><code>sudo ufw logging low</code>: blocked packets that hit the default policy, plus rate-limited (LIMIT) ones.</li>
-          <li><code>medium</code>: adds allowed new connections (ALLOW) and invalid packets.</li>
-          <li><code>high</code> / <code>full</code>: adds AUDIT and less rate limiting. Noisy.</li>
-          <li>Per-rule logging: <code>ufw allow log 22/tcp</code> or <code>ufw deny log-all ...</code></li>
-        </ul>
-        <h3>OPNsense</h3>
-        <ul>
-          <li>Each rule logs only if its <b>Log</b> box is ticked (Firewall → Rules → edit the rule).</li>
-          <li>The built-in default block and pass rules have their own logging switches under Firewall → Settings.</li>
-          <li>Rules and interfaces show up as IDs (<code>vtnet0</code>, <code>rule 439d8dff…</code>). To see names, drop these along with the logs:
-            <ul>
-              <li>a config backup (System → Configuration → Backups → Download): your own rules, plus interface names like LAN and WAN</li>
-              <li>for built-in rules (default deny, bogons ...): open <code>https://&lt;firewall&gt;/api/diagnostics/firewall/list_rule_ids</code> while logged in and save the page as <code>rule_ids.json</code></li>
-            </ul>
-            Only the names are kept, in this browser. The rest of the backup, including its passwords and keys, isn't stored.</li>
-        </ul>
-        <h3>Windows Firewall</h3>
-        <ul>
-          <li><code>-LogBlocked True</code>: dropped packets (DROP). <code>-LogAllowed True</code> adds allowed connections (ALLOW), which is very noisy on a desktop.</li>
-          <li>No interface, rule or TTL is logged. Direction shows as <code>receive</code> (In) or <code>send</code> (Out).</li>
-          <li>Times are local with no timezone, so read the log in the same timezone as the PC.</li>
-        </ul>
-        <h3>ModSecurity</h3>
-        <ul>
-          <li><code>SecAuditEngine RelevantOnly</code> (the usual setting) logs requests that tripped a rule. Each one shows as <b>WAF BLOCK</b> if it was stopped, or <b>WAF DETECT</b> if it was only flagged.</li>
-          <li>Attack types (SQLi, XSS, LFI, RCE ...) come from the OWASP Core Rule Set's rule numbers, or from <code>attack-*</code> tags for other rule sets.</li>
-          <li>Load firewall logs alongside and addresses seen by both are marked <b>firewall + WAF</b>; filter them with <code>seen:both</code>. With a fail2ban log loaded, <code>seen:f2b</code> shows the sources it banned.</li>
-        </ul>
-      </div>
+      <p class="hint">More detail on every format is in the <a href="https://github.com/magikh0e/fwscope#readme" target="_blank" rel="noopener">README</a>.</p>
     </div>
   </section>
 
@@ -398,6 +466,11 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
     </div>
 
     <div class="tiles" id="tiles"></div>
+    <div class="card since" id="sinceCard" hidden>
+      <div class="card-head"><h2>Since your last visit</h2><span class="sub" id="sinceSub"></span><span class="grow"></span><button id="btnForgetVisits" title="Forget what earlier visits saw; the next visit starts fresh">Forget history</button></div>
+      <div id="sinceBody"></div>
+      <div class="hint">Compared with what this browser saw on earlier visits (it keeps hashed addresses, not the addresses). Public sources only; ports count blocked traffic. Click to filter, shift-click to exclude.</div>
+    </div>
 
     <div class="card">
       <div class="card-head"><h2>Events over time</h2><span class="sub" id="tlSub"></span><span class="grow"></span><label class="tog" id="tlSplitWrap" hidden title="Firewall and WAF events as two charts on the same time axis, each with its own scale"><input type="checkbox" id="tlSplit" checked> Split firewall / WAF</label><div class="legend" id="tlLegend"></div></div>
@@ -671,7 +744,7 @@ function geoFrom(r) {
 /* ============================================================ GeoIP databases (kept in IndexedDB) */
 const GEO = { dbs: [] };
 const IDB = {
-  open() { return new Promise((res, rej) => { const r = indexedDB.open('ufwviz', 1); /* storage keys keep the old ufw-viz name so saved databases and theme survive the rename */ r.onupgradeneeded = () => r.result.createObjectStore('mmdb'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  open() { return new Promise((res, rej) => { const r = indexedDB.open('ufwviz', 2); /* storage keys keep the old ufw-viz name so saved databases and theme survive the rename */ r.onupgradeneeded = () => { const db = r.result; if (!db.objectStoreNames.contains('mmdb')) db.createObjectStore('mmdb'); if (!db.objectStoreNames.contains('session')) db.createObjectStore('session'); }; r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
   async put(key, val) { try { const db = await this.open(); db.transaction('mmdb', 'readwrite').objectStore('mmdb').put(val, key); } catch {} },
   async all() {
     try {
@@ -818,7 +891,7 @@ function actId(label) {
   if (D.actGroup[id] === undefined) {
     const u = label.toUpperCase();
     D.actGroup[id] = /^(LIMIT|WAF CHALLENGE)/.test(u) ? 1
-      : /^(AUDIT|WAF DETECT|F2B FOUND)/.test(u) ? 3
+      : /^(AUDIT|WAF DETECT|F2B FOUND|F2B REPEAT)/.test(u) ? 3
       : /^(ALLOW|PASS|WAF ALLOW|F2B UNBAN)/.test(u) ? 2
       : /^(BLOCK|DROP|REJECT|DENY|WAF BLOCK|F2B BAN|LIMIT BLOCK)/.test(u) ? 0
       : /ACCEPT|ALLOW|PASS/.test(u) ? 2 : /DROP|REJECT|DENY|BLOCK|BAN/.test(u) ? 0 : /LIMIT/.test(u) ? 1 : 3;
@@ -833,6 +906,8 @@ function hash(str) { let h1 = 0xdeadbeef, h2 = 0x41c6ce57; for (let i = 0; i < s
 const RE_ISO = /^(\d{4}-\d\d-\d\d)[T ](\d\d:\d\d:\d\d)(?:[.,](\d+))?(Z|[+-]\d\d:?\d\d)?/;
 const RE_SYS = /^([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d\d):(\d\d):(\d\d)/;
 const RE_DMESG = /^\[\w{3} (\w{3})\s+(\d{1,2}) (\d\d):(\d\d):(\d\d) (\d{4})\]/;
+// OpenWrt's logread: "Sat Nov  7 10:00:01 2026 kern.warn kernel: ..." (no hostname; facility.level instead)
+const RE_LOGREAD = /^\w{3} (\w{3})\s+(\d{1,2}) (\d\d):(\d\d):(\d\d) (\d{4}) (?=\w+\.\w+ )/;
 const RE_HOST = /^\s+(\S+)\s+(?:kernel|filterlog)\b/;
 const RE_PRI = /^<\d{1,3}>\d?\s?/; // RFC 5424 / 3164 priority prefix, as in OPNsense's /var/log/filter files
 
@@ -852,6 +927,8 @@ function parseTime(line, ctx) {
   }
   m = RE_DMESG.exec(line);
   if (m && MON[m[1]] !== undefined) return { ts: wallTime(+m[6], MON[m[1]], +m[2], +m[3], +m[4], +m[5]), len: m[0].length };
+  m = RE_LOGREAD.exec(line);
+  if (m && MON[m[1]] !== undefined) return { ts: wallTime(+m[6], MON[m[1]], +m[2], +m[3], +m[4], +m[5]), len: m[0].length, logread: true };
   return { ts: NaN, len: 0 };
 }
 
@@ -871,6 +948,9 @@ function handleLine(line, ctx) {
   if (line.indexOf('ModSecurity: ') >= 0) { D.lines++; modsecErrorLine(line, ctx); return; }
   if (line.indexOf(' fail2ban.') > 0 && fail2banLine(line, ctx)) { D.lines++; return; }
   if (line.indexOf('[**]') > 0 && suricataFast(line, ctx)) { D.lines++; return; }
+  if (line.indexOf('srcaddr') >= 0 && line.indexOf('dstaddr') > 0 && !/SRC=/.test(line) && vpcHeader(line, ctx)) return; // VPC flow log header (default or custom format)
+  if (ctx.vpcFields ? /^\S+ /.test(line) && !line.startsWith('version') : RE_VPC.test(line)) { D.lines++; vpcLine(line, ctx); return; }
+  { const cw = RE_CW_VPC.exec(line); if (cw) { D.lines++; vpcLine(line.slice(cw[0].length), ctx); return; } } // CloudWatch export: a timestamp in front
   { const j = line.indexOf('{"timestamp"'); if (j > 0 && line.indexOf('"event_type"') > j) { try { handleObj(JSON.parse(line.slice(j)), ctx); } catch {} return; } }
   const f = line.indexOf('filterlog');
   if (f >= 0) {
@@ -946,6 +1026,7 @@ function handleJson(line, ctx) {
 }
 function handleObj(o, ctx) {
   if (!o || typeof o !== 'object') return;
+  if (Array.isArray(o.records) && o.records.length && (o.records[0].properties || o.records[0].flowRecords)) { azureRecords(o, ctx); return; } // Azure flow logs
   if (o.event_type && o.timestamp && ('src_ip' in o || 'flow_id' in o)) { if (o.event_type === 'alert') { D.lines++; suricataAlert(o, ctx); } return; } // Suricata eve.json
   if ((o.EventID || o.Id) && WFP_EVENTS[+(o.EventID || o.Id)] && ('DestAddress' in o || 'SourceAddress' in o)) { D.lines++; winSecEvent(o, ctx); return; }
   if (('ClientIP' in o || 'clientIP' in o) && ('Action' in o || 'action' in o) && ('RayID' in o || 'rayName' in o || 'Source' in o || 'source' in o)) { D.lines++; cfEvent(o, ctx); return; }
@@ -1311,7 +1392,7 @@ function ufwMsg(msg, ts, host, ctx) {
   addPacketKv(body, label, ts, host, ctx);
 }
 // IN= OUT= SRC= DST= PROTO= SPT= DPT= ... as written by the netfilter LOG target (UFW, iptables, nftables, firewalld)
-function addPacketKv(body, label, ts, host, ctx) {
+function addPacketKv(body, label, ts, host, ctx, rule) {
   const kv = Object.create(null);
   let flags = 0, depth = 0;
   const toks = body.split(' ');
@@ -1327,7 +1408,7 @@ function addPacketKv(body, label, ts, host, ctx) {
   let proto = kv.PROTO || '?';
   if (/^\d+$/.test(proto)) proto = PROTO_NUM[proto] || 'proto ' + proto;
   const num = x => x !== undefined ? +x : undefined;
-  addRow({ ts, host, act: label, proto, src: kv.SRC, dst: kv.DST, spt: num(kv.SPT), dpt: num(kv.DPT), iin: kv.IN, iout: kv.OUT,
+  addRow({ ts, host, act: label, rule, proto, src: kv.SRC, dst: kv.DST, spt: num(kv.SPT), dpt: num(kv.DPT), iin: kv.IN, iout: kv.OUT,
     len: num(kv.LEN), ttl: num(kv.TTL ?? kv.HOPLIMIT), flags, itype: num(kv.TYPE), icode: num(kv.CODE),
     mac: kv.MAC && kv.MAC.length >= 35 ? kv.MAC.slice(18, 35) : '' }, ctx);
 }
@@ -1365,34 +1446,99 @@ function suricataFast(line, ctx) {
     spt: spt && !icmp ? +spt : undefined, dpt: dpt && !icmp ? +dpt : undefined, itype: icmp && spt ? +spt : undefined, icode: icmp && dpt ? +dpt : undefined, rule: sid }, ctx);
   return true;
 }
+/* ---------- AWS VPC Flow Logs (text, as delivered to S3 or exported from CloudWatch)
+   Default (version 2) fields: version account-id interface-id srcaddr dstaddr srcport dstport protocol packets bytes
+   start end action log-status. A custom format comes with a header line naming its fields, which is used instead. */
+const VPC_DEFAULT = 'version account-id interface-id srcaddr dstaddr srcport dstport protocol packets bytes start end action log-status'.split(' ');
+const RE_VPC = /^\d+ (?:\d{12}|-) (?:eni-[0-9a-f]+|-) /; // a default-format record
+const RE_CW_VPC = /^\d{4}-\d\d-\d\dT\S+\s+(?=\d+ (?:\d{12}|-) (?:eni-[0-9a-f]+|-) )/;
+function vpcHeader(line, ctx) { // "version account-id ..." (S3), possibly with ${...} around the names
+  const f = line.trim().replace(/\$\{([^}]+)\}/g, '$1').split(/\s+/);
+  if (f.includes('srcaddr') && f.includes('dstaddr') && f.includes('action')) { ctx.vpcFields = f; return true; }
+  return false;
+}
+function vpcLine(line, ctx) {
+  const F = ctx.vpcFields || VPC_DEFAULT, v = line.trim().split(/\s+/), o = {};
+  for (let i = 0; i < F.length && i < v.length; i++) o[F[i]] = v[i];
+  if (!o.action || o.action === '-' || o['log-status'] === 'NODATA' || o['log-status'] === 'SKIPDATA') return;
+  D.kinds.vpc = 1;
+  const ts = +o.start * 1000;
+  if (isDup(ts, line, ctx)) return;
+  const n = x => x !== undefined && /^\d+$/.test(x) ? +x : undefined;
+  const pn = o.protocol, proto = /^\d+$/.test(pn || '') ? PROTO_NUM[pn] || 'proto ' + pn : (pn || '?').toUpperCase();
+  const icmp = /ICMP/.test(proto), out = o['flow-direction'] === 'egress';
+  const eni = o['interface-id'] && o['interface-id'] !== '-' ? o['interface-id'] : '';
+  addRow({ ts, host: o['vpc-id'] && o['vpc-id'] !== '-' ? o['vpc-id'] : o['account-id'] && o['account-id'] !== '-' ? 'aws ' + o['account-id'] : 'aws', act: o.action,
+    proto, src: o['pkt-srcaddr'] && o['pkt-srcaddr'] !== '-' ? o['pkt-srcaddr'] : o.srcaddr, dst: o.dstaddr,
+    spt: icmp ? undefined : n(o.srcport), dpt: icmp ? undefined : n(o.dstport), iin: out ? '' : eni, iout: out ? eni : '' }, ctx);
+}
+
+/* ---------- Azure network flow logs (JSON blobs from the storage account)
+   NSG flow logs: records[].properties.flows[].flows[].flowTuples "ts,src,dst,sport,dport,T|U,I|O,A|D,B|C|E,..."
+   VNet flow logs: records[].flowRecords.flows[].flowGroups[].flowTuples "ts_ms,src,dst,sport,dport,proto#,I|O,B|C|E|D,..."
+   A flow's begin record counts once (continuations and ends of the same flow would count it again); denied flows
+   only ever have one record. */
+function azureRecords(o, ctx) {
+  for (const r of o.records) {
+    const res = String(r.resourceId || r.flowLogResourceID || r.targetResourceID || '');
+    const host = (res.split('/').filter(Boolean).pop() || 'azure').toLowerCase();
+    if (r.properties && Array.isArray(r.properties.flows)) { // NSG flow logs, version 1 and 2
+      for (const g of r.properties.flows) for (const f of g.flows || []) for (const t of f.flowTuples || []) { D.lines++; azureTuple(t, g.rule, host, f.mac, false, ctx); }
+    } else if (r.flowRecords && Array.isArray(r.flowRecords.flows)) { // VNet flow logs
+      for (const a of r.flowRecords.flows) for (const g of a.flowGroups || []) for (const t of g.flowTuples || []) { D.lines++; azureTuple(t, g.rule, host, r.macAddress, true, ctx); }
+    }
+  }
+}
+function azureTuple(t, rule, host, mac, vnet, ctx) {
+  const v = String(t).split(','); if (v.length < 8) return;
+  const state = vnet ? v[7] : v[8] || 'B', denied = vnet ? state === 'D' : v[7] === 'D';
+  if (!denied && state !== 'B') return; // C / E: the same flow again
+  D.kinds.azure = 1;
+  const ts = vnet ? +v[0] : +v[0] * 1000;
+  if (isDup(ts, t + ' ' + rule, ctx)) return;
+  const p = v[5], proto = p === 'T' ? 'TCP' : p === 'U' ? 'UDP' : /^\d+$/.test(p) ? PROTO_NUM[p] || 'proto ' + p : p;
+  const icmp = /ICMP/.test(proto), out = v[6] === 'O', nic = mac ? String(mac).toLowerCase().replace(/(..)(?!$)/g, '$1:') : '';
+  addRow({ ts, host, act: denied ? 'DENY' : 'ALLOW', rule: rule || '', proto, src: v[1], dst: v[2], spt: icmp ? undefined : +v[3], dpt: icmp ? undefined : +v[4],
+    iin: out ? '' : 'inbound', iout: out ? 'outbound' : '', mac: nic }, ctx);
+}
 /* ---------- other netfilter logging: nftables "log prefix", iptables -j LOG --log-prefix, firewalld
    Same key=value packet as UFW, after a free-form prefix ("nft-drop: ", "FINAL_REJECT: ", "IPTables-Dropped: ").
    The prefix becomes the action, grouped by its wording (drop / reject / accept ...). */
 function netfilterLine(line, ctx) {
   const k = line.indexOf('kernel:'), from = k >= 0 ? k + 7 : 0;
-  const inAt = line.indexOf(' IN=', from); if (inAt < 0) return;
+  // the packet starts at IN=; OpenWrt's fw3 writes its prefix right against it ("DROP(src wan)IN=eth0")
+  const im = /[\s)]IN=/.exec(line.slice(from)); if (!im) return;
+  const inAt = from + im.index;
   D.kinds.nf = 1;
   const t = parseTime(line, ctx);
-  let host = ''; if (t.len) { const hm = RE_HOST.exec(line.slice(t.len)); if (hm) host = hm[1]; }
+  let host = '';
+  if (t.logread) host = ctx.owHost; // logread has no hostname: the file name, or "openwrt"
+  else if (t.len) { const hm = RE_HOST.exec(line.slice(t.len)); if (hm) host = hm[1]; }
   const prefix = line.slice(from, inAt + 1).replace(/^\s*\[\s*\d+\.\d+\]\s*/, '').replace(/[:\s]+$/, '').trim();
-  const label = (prefix || 'LOG').toUpperCase().replace(/[_\s]+/g, ' ').slice(0, 40);
+  let label = (prefix || 'LOG').toUpperCase().replace(/[_\s]+/g, ' ').slice(0, 40), rule = '';
+  // OpenWrt: fw4 (nftables) "drop wan in:", "reject lan forward:"; fw3 (iptables) "DROP(src wan)", "REJECT(dest wan)".
+  // The verdict becomes the action and the zone the rule, so the Rules list shows which zone logged what.
+  const ow = /^(drop|reject|accept)\s+(\S+)\s+(in|out|forward)$/i.exec(prefix) || /^(drop|reject|accept)\((src|dest)\s+(\S+)\)$/i.exec(prefix);
+  if (ow) { D.kinds.openwrt = 1; label = ow[1].toUpperCase(); rule = `${ow[2]}_${ow[3]}`.toLowerCase(); }
   const body = line.slice(inAt + 1);
   if (isDup(t.ts, body, ctx)) return;
-  addPacketKv(body, label, t.ts, host, ctx);
+  addPacketKv(body, label, t.ts, host, ctx, rule);
 }
 
 /* ---------- fail2ban's own log: what it found, banned and unbanned, per jail
    2026-11-07 12:00:00,123 fail2ban.actions [1234]: NOTICE  [sshd] Ban 203.0.113.9 */
-const RE_F2B = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)(?:,(\d+))?\s+fail2ban\.\w+\s+\[\d+\]:\s+\w+\s+\[([^\]]+)\]\s+(Ban|Unban|Found|Restore Ban)\s+(\S+)/;
+const RE_F2B = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)(?:,(\d+))?\s+fail2ban\.\w+\s+\[\d+\]:\s+\w+\s+\[([^\]]+)\]\s+(?:(Ban|Unban|Found|Restore Ban)\s+(\S+)|(\S+)\s+already banned)/;
 function fail2banLine(line, ctx) {
   const m = RE_F2B.exec(line); if (!m) return false;
   D.kinds.f2b = 1;
   const ts = wallTime(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + (m[7] ? +m[7].slice(0, 3) : 0);
   if (isDup(ts, line.slice(19), ctx)) return true;
-  const what = m[9] === 'Found' ? 'F2B FOUND' : m[9] === 'Unban' ? 'F2B UNBAN' : 'F2B BAN';
-  addRow({ ts, host: '', act: what, proto: '?', src: m[10], rule: m[8] }, ctx);
+  // "already banned": seen again after its ban, so the ban isn't keeping it out (behind a proxy or CDN, say)
+  const what = m[11] ? 'F2B REPEAT' : m[9] === 'Found' ? 'F2B FOUND' : m[9] === 'Unban' ? 'F2B UNBAN' : 'F2B BAN';
+  addRow({ ts, host: '', act: what, proto: '?', src: m[10] || m[11], rule: m[8] }, ctx);
   return true;
 }
+const owHostName = name => { const st = (name || '').replace(/(\.(log|txt|gz|\d+))+$/i, ''); return !st || /^(logread|messages|system|syslog|kern|kernel|pasted text|sample \(generated\))$/i.test(st) ? 'openwrt' : st; };
 const idsHostName = name => { const st = (name || '').replace(/(\.(log|json|txt|gz|\d+))+$/i, ''); return /^(eve|fast|alerts?|suricata|pasted text|sample \(generated\))$/i.test(st) ? '' : st; };
 function newCtx(ref) { const r = ref || Date.now(); return { ref: r, year: new Date(r).getFullYear(), keys: new Float64Array(4096), kn: 0, lo: Infinity, hi: -Infinity, nan: false, pk: 0, skipped0: D.skipped }; }
 function closeCtx(ctx) { wafFlush(ctx); if (ctx.kn) D.prior.push({ keys: ctx.keys.slice(0, ctx.kn), lo: ctx.lo, hi: ctx.hi, nan: ctx.nan, set: null }); }
@@ -1439,12 +1585,12 @@ for (const [id, k] of [['#optChatter', 'chatter'], ['#optBlocks', 'blocksOnly']]
 
 /*W>*/
 async function readFile(file, idx, total) {
-  const ctx = newCtx(file.lastModified); ctx.name = file.name; ctx.idsHost = idsHostName(file.name);
+  const ctx = newCtx(file.lastModified); ctx.name = file.name; ctx.idsHost = idsHostName(file.name); ctx.owHost = owHostName(file.name);
   const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
   const gz = head[0] === 0x1f && head[1] === 0x8b;
   // a JSON array, e.g. saved from the OPNsense API (not "[Sat Nov 07 ...", which is an Apache error log)
   const head64 = gz ? '' : await file.slice(0, 64).text();
-  if (!gz && (/^\s*\[\s*[{"\]]/.test(head64) || /^\s*\{\s*"data"/.test(head64))) {
+  if (!gz && (/^\s*\[\s*[{"\]]/.test(head64) || /^\s*\{\s*"(data|records)"/.test(head64))) {
     const before = D.n, d0 = D.dupes; jsonArray(await file.text(), ctx); closeCtx(ctx);
     D.files.push({ name: file.name, src: file, events: D.n - before, dupes: D.dupes - d0, skipped: D.skipped - ctx.skipped0 }); return;
   }
@@ -1576,9 +1722,9 @@ async function loadText(name, text, ref) {
   finish();
 }
 async function readText(name, text, ref) {
-  const ctx = newCtx(ref); ctx.name = name; ctx.idsHost = idsHostName(name);
+  const ctx = newCtx(ref); ctx.name = name; ctx.idsHost = idsHostName(name); ctx.owHost = owHostName(name);
   const before = D.n, d0 = D.dupes;
-  const lines = /^\s*\[\s*[{"\]]/.test(text) || /^\s*\{\s*"data"/.test(text) ? (tryJson(text, ctx), []) : text.split('\n');
+  const lines = /^\s*\[\s*[{"\]]/.test(text) || /^\s*\{\s*"(data|records)"/.test(text) ? (tryJson(text, ctx), []) : text.split('\n');
   for (let i = 0; i < lines.length && !D.stop; i++) { handleLine(lines[i], ctx); if ((i & 32767) === 32767) { progress(`Parsing ${name}`, i / lines.length); await tick(); } }
   closeCtx(ctx);
   D.files.push({ name, src: { text, ref: ctx.ref }, events: D.n - before, dupes: D.dupes - d0, skipped: D.skipped - ctx.skipped0, partial: !!D.stop });
@@ -1587,6 +1733,7 @@ async function readText(name, text, ref) {
 // out exactly as if it had never been loaded. The view, filter and block ticks stay.
 async function removeFile(idx) {
   const gone = D.files[idx], keep = D.files.filter((_, i) => i !== idx), demo = D.demoGeo;
+  if (keep.some(f => !f.src)) { alert('This session was reopened from the browser, which keeps the parsed events but not the files. To take one file out, open the files you want again (Clear, then Open logs).'); return; }
   if (!keep.length) { $('#btnClear').click(); return; }
   resetStore(); D.demoGeo = demo; D.stop = false;
   try {
@@ -1667,14 +1814,14 @@ function finish() {
   D.actWaf = Uint8Array.from(D.act.list, s => s.startsWith('WAF') ? 1 : 0);
   D.ipSeen = new Uint8Array(D.ip.list.length);
   // fail2ban lines aren't traffic: they say what fail2ban did about a source (2 banned, 1 only found)
-  const f2bOf = D.act.list.map(s => s === 'F2B BAN' ? 2 : s.startsWith('F2B') ? 1 : 0), idsAct = D.act.list.map(s => s.startsWith('IDS ') ? 1 : 0);
+  const f2bOf = D.act.list.map(s => s === 'F2B BAN' || s === 'F2B REPEAT' ? 2 : s.startsWith('F2B') ? 1 : 0), idsAct = D.act.list.map(s => s.startsWith('IDS ') ? 1 : 0);
   D.f2b = D.kinds.f2b ? new Uint8Array(D.ip.list.length) : null;
   for (let i = 0; i < D.n; i++) {
     const a = D.c.act[i], f = f2bOf[a];
     if (f) { if (f > D.f2b[D.c.src[i]]) D.f2b[D.c.src[i]] = f; continue; }
     D.ipSeen[D.c.src[i]] |= D.actWaf[a] ? 2 : idsAct[a] ? 4 : 1;
   }
-  D.both = D.waf && (D.kinds.ufw || D.kinds.opn || D.kinds.win || D.kinds.nf || D.kinds.f2b || D.kinds.ids);
+  D.both = D.waf && (D.kinds.ufw || D.kinds.opn || D.kinds.win || D.kinds.nf || D.kinds.f2b || D.kinds.ids || D.kinds.vpc || D.kinds.azure);
   D.wafRows = 0; if (D.waf) for (let i = 0; i < D.n; i++) if (D.actWaf[D.c.act[i]]) D.wafRows++;
   D.hasRules = D.rule.list.length > 1;
   indexBlocklists();
@@ -1693,6 +1840,8 @@ function finish() {
       (dup ? `, ${fmtN(dup)} duplicate${dup === 1 ? '' : 's'} skipped` : '') + `. ${fmtN(D.files.length)} files loaded.`);
   }
   D.fresh = false; D.shownFiles = D.files.length; D.shownN = D.n; D.shownDupes = D.dupes;
+  saveSession();
+  computeSince(); renderSince();
   const real = !D.demoGeo;
   $('#btnOpen').textContent = real ? 'Add logs' : 'Open logs';
   $('#btnOpen').title = real ? 'Add more log files to what is loaded (or drop them anywhere). Clear starts over.' : 'Open log files (they replace the sample)';
@@ -2329,6 +2478,134 @@ function namesStatus() {
   box.append(b);
 }
 
+/* ============================================================ since your last visit
+   Each visit leaves a small fingerprint in this browser: hashed source addresses (not the addresses), the
+   destination ports, attack types, rules and countries seen, and the newest event time. The next visit compares
+   against it and lists what's new. Visits add up, so "new" means never seen in any earlier visit (up to 100,000
+   sources are remembered). */
+const VISIT = { prev: null, card: null };
+try { VISIT.prev = JSON.parse(localStorage.getItem('fwscope-visit') || 'null'); } catch {}
+const fnv = str => { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; };
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 32768) s += String.fromCharCode.apply(null, u8.subarray(i, i + 32768)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s || ''), ch => ch.charCodeAt(0));
+function visitNow() {
+  const c = D.c, n = D.n, per = new Map(), ports = new Uint8Array(8192), cats = new Set(), rules = new Set(), ccs = new Set();
+  for (let i = 0; i < n; i++) {
+    const s = c.src[i]; if (!c.iout[i]) per.set(s, (per.get(s) || 0) + 1); // inbound: your own outbound traffic is not a newcomer
+    const p = c.dpt[i]; if (p >= 0 && p < 65536 && D.actGroup[c.act[i]] <= 1 && !(D.ipc[s] & 7) && !(D.ipc[c.dst[i]] & 6)) ports[p >> 3] |= 1 << (p & 7);
+    if (c.rule[i]) rules.add(D.rule.list[c.rule[i]]);
+  }
+  if (D.waf) for (const k of D.wcat.list) if (k) cats.add(k);
+  if (D.geo) for (const [s] of per) { const x = D.ipCC[s]; if (x >= 0) ccs.add(D.cc.list[x]); }
+  return { per, ports, cats, rules, ccs };
+}
+function computeSince() {
+  VISIT.card = null;
+  if (!D || !D.n || D.demoGeo) return;
+  const now = visitNow(), prev = VISIT.prev;
+  if (prev) {
+    const seen = new Set(unb64(prev.src).length ? new Uint32Array(unb64(prev.src).buffer) : []), pp = unb64(prev.ports);
+    const pc = new Set(prev.cats || []), pr = new Set(prev.rules || []), pcc = new Set(prev.ccs || []);
+    const newSrc = [...now.per].filter(([s]) => D.ip.list[s] && !(D.ipc[s] & 7) && !seen.has(fnv(D.ip.list[s]))).sort((a, b) => b[1] - a[1]); // public sources only, like the Scans card
+    const portN = new Map(); for (let i = 0; i < D.n; i++) { const p = D.c.dpt[i]; if (p >= 0 && p < 65536 && D.actGroup[D.c.act[i]] <= 1 && !(D.ipc[D.c.src[i]] & 7) && !(D.ipc[D.c.dst[i]] & 6) && !(pp[p >> 3] & (1 << (p & 7)))) portN.set(p, (portN.get(p) || 0) + 1); }
+    let after = 0; if (prev.maxTs === prev.maxTs) for (let i = 0; i < D.n; i++) if (D.c.ts[i] > prev.maxTs) after++;
+    VISIT.card = { at: prev.at, maxTs: prev.maxTs, after, src: newSrc, ports: [...portN].sort((a, b) => b[1] - a[1]),
+      cats: [...now.cats].filter(k => !pc.has(k)), rules: [...now.rules].filter(k => !pr.has(k)), ccs: [...now.ccs].filter(k => !pcc.has(k)) };
+  }
+  // remember this visit, added to the earlier ones
+  const keep = new Set([...now.per].sort((a, b) => b[1] - a[1]).map(([s]) => D.ip.list[s]).filter(Boolean).map(fnv));
+  if (prev && prev.src) for (const h of new Uint32Array(unb64(prev.src).buffer)) { if (keep.size >= 100000) break; keep.add(h); }
+  const hashes = Uint32Array.from([...keep].slice(0, 100000)), ports = now.ports.slice();
+  if (prev && prev.ports) { const pp = unb64(prev.ports); for (let i = 0; i < 8192; i++) ports[i] |= pp[i] || 0; }
+  const union = (a, b) => [...new Set([...(a || []), ...b])].slice(0, 5000);
+  const fp = { at: Date.now(), maxTs: Math.max(D.maxTs, prev && prev.maxTs || -Infinity), src: b64(new Uint8Array(hashes.buffer)), ports: b64(ports),
+    cats: union(prev && prev.cats, now.cats), rules: union(prev && prev.rules, now.rules), ccs: union(prev && prev.ccs, now.ccs) };
+  try { localStorage.setItem('fwscope-visit', JSON.stringify(fp)); } catch {}
+}
+function renderSince() {
+  const box = $('#sinceCard'), v = VISIT.card;
+  const any = v && (v.after || v.src.length || v.ports.length || v.cats.length || v.rules.length || v.ccs.length);
+  box.hidden = !any; if (!any) return;
+  $('#sinceSub').textContent = `you last looked ${new Date(v.at).toLocaleString()}` + (v.maxTs === v.maxTs ? `, at logs up to ${fmtTime(v.maxTs)}` : '');
+  const body = $('#sinceBody'); body.textContent = '';
+  const row = (label, items, tok, name) => {
+    if (!items.length) return;
+    const d = el('div', 'since-row'); d.append(el('span', 'since-label', `${label} (${fmtN(items.length)})`));
+    for (const it of items.slice(0, 8)) {
+      const b = el('button', 'chip-btn', name(it)); b.title = 'Click to filter, shift-click to exclude';
+      b.onclick = e => addToken(tok(it), e.shiftKey); d.append(b);
+    }
+    if (items.length > 8) d.append(el('span', 'since-more', `+ ${fmtN(items.length - 8)} more`));
+    body.append(d);
+  };
+  if (v.after) {
+    const d = el('div', 'since-row'); d.append(el('span', 'since-label', `${fmtN(v.after)} events newer than what you saw last time`));
+    const b = el('button', null, 'Show them'); b.onclick = () => { F.range = [v.maxTs + 1, D.maxTs + 1]; F.page = 0; apply(); };
+    d.append(b); body.append(d);
+  }
+  row('New sources', v.src, ([s]) => 'src:' + D.ip.list[s], ([s, n]) => `${D.ip.list[s]} ×${fmtN(n)}`);
+  row('Newly targeted ports', v.ports, ([p]) => 'dpt:' + p, ([p, n]) => `${p}${svcName(p) ? ' ' + svcName(p) : ''} ×${fmtN(n)}`);
+  row('New attack types', v.cats, k => 'attack:' + k.replace(/ /g, '_'), k => k);
+  row('New rules', v.rules, k => 'rule:' + k, k => ruleName(k));
+  row('New countries', v.ccs, k => 'cc:' + k, k => ccName(k));
+}
+function forgetVisits() { try { localStorage.removeItem('fwscope-visit'); } catch {} VISIT.prev = null; VISIT.card = null; $('#sinceCard').hidden = true; }
+/* ============================================================ last session (kept in this browser)
+   After real logs load, the parsed store is saved to IndexedDB, so the next visit can reopen it without reading
+   the files again. Only the parsed events are kept, not the files themselves; everything derived is rebuilt. */
+const SESSION = { info: null, on: true };
+try { SESSION.on = localStorage.getItem('fwscope-remember') !== '0'; } catch {}
+const sessionStore = async mode => { const db = await IDB.open(); return db.transaction('session', mode).objectStore('session'); };
+const idbReq = rq => new Promise((ok, no) => { rq.onsuccess = () => ok(rq.result); rq.onerror = () => no(rq.error); });
+function sessionSnapshot() {
+  const d = {};
+  for (const [k, v] of Object.entries(D)) {
+    if (ArrayBuffer.isView(v) || k === 'stop' || k === 'order') continue; // derived lookups, rebuilt on reopen
+    d[k] = v;
+  }
+  d.c = {}; for (const [k, v] of Object.entries(D.c)) d.c[k] = D.cap > D.n * 1.25 ? v.slice(0, D.n) : v; // no room to grow
+  d.cap = D.cap > D.n * 1.25 ? D.n : D.cap;
+  d.files = D.files.map(f => ({ ...f, src: null })); // the files themselves stay where they are
+  return d;
+}
+let sessionTimer;
+function saveSession() {
+  clearTimeout(sessionTimer);
+  if (!SESSION.on || !D || !D.n || D.demoGeo) return;
+  if (D.skipSave) { D.skipSave = false; return; } // just reopened: it is what is saved
+  sessionTimer = setTimeout(async () => {
+    if (!D || !D.n || D.demoGeo) return;
+    const info = { at: Date.now(), n: D.n, files: D.files.map(f => f.name), minTs: D.minTs, maxTs: D.maxTs, mb: memMB() };
+    try {
+      const st = await sessionStore('readwrite');
+      await idbReq(st.put(sessionSnapshot(), 'data')); await idbReq((await sessionStore('readwrite')).put(info, 'info'));
+      SESSION.info = info;
+    } catch (e) { SESSION.info = null; toast('Could not keep this load for next time: ' + (e && e.name === 'QuotaExceededError' ? 'not enough browser storage.' : (e && e.message || e))); }
+    sessionStatus();
+  }, 1500);
+}
+async function forgetSession() {
+  clearTimeout(sessionTimer); SESSION.info = null;
+  try { const st = await sessionStore('readwrite'); await idbReq(st.clear()); } catch {}
+  sessionStatus();
+}
+async function reopenSession() {
+  progress('Reopening your last session…', null); await tick();
+  let d = null; try { d = await idbReq((await sessionStore('readonly')).get('data')); } catch {}
+  if (!d) { $('#progress').style.display = 'none'; alert('The saved session could not be read. It may have been cleared by the browser.'); forgetSession(); return; }
+  D = reviveStore(d); D.fresh = true; D.reopened = SESSION.info && SESSION.info.at; D.stop = false; D.skipSave = true;
+  finish();
+  D.fresh = false; D.shownFiles = D.files.length; D.shownN = D.n; D.shownDupes = D.dupes;
+  toast(`Reopened ${fmtN(D.n)} events from ${fmtN(D.files.length)} file${D.files.length === 1 ? '' : 's'}. Add logs to bring it up to date.`);
+}
+function sessionStatus() {
+  const box = $('#sessionBox'), i = SESSION.info;
+  box.hidden = !i || !!(D && D.n && !D.demoGeo);
+  $('#optRemember').checked = SESSION.on;
+  if (!i) return;
+  $('#sessionText').textContent = `${fmtN(i.n)} events from ${i.files.length === 1 ? i.files[0] : fmtN(i.files.length) + ' files'}` +
+    (i.minTs === i.minTs ? ` (${fmtTime(i.minTs)} – ${fmtTime(i.maxTs)})` : '') + `, kept ${new Date(i.at).toLocaleString()}.`;
+}
 /* ============================================================ blocklists (offline reputation check)
    Drop a plain list of addresses and ranges (Spamhaus DROP, FireHOL .netset/.ipset, your own list) and every
    source on it is marked. Nothing is looked up online. Lists are kept in this browser (IndexedDB) until removed. */
@@ -2617,7 +2894,7 @@ function dimApplies(k) {
 function autoView() {
   const kinds = Object.keys(D.kinds).length, hosts = D.host.list.filter(Boolean).length;
   // A: who, B: what. Mixed logs or several machines: split by machine first.
-  const packets = D.kinds.ufw || D.kinds.opn || D.kinds.win || D.kinds.nf || D.kinds.f2b || D.kinds.ids;
+  const packets = D.kinds.ufw || D.kinds.opn || D.kinds.win || D.kinds.nf || D.kinds.f2b || D.kinds.ids || D.kinds.vpc || D.kinds.azure;
   const auto = D.waf && !packets ? { dimA: 'src', dimB: 'attack' }
     : D.waf ? { dimA: 'src', dimB: 'host' }
     : kinds > 1 || hosts > 1 ? { dimA: 'host', dimB: 'dpt' }
@@ -3115,7 +3392,7 @@ function ipRank() {
   for (let i = 0; i < D.ip.list.length; i++) if (!D.ip.list[i]) D.ipRank[i] = -1;
   return D.ipRank;
 }
-const hasPackets = () => !D.waf || D.kinds.ufw || D.kinds.opn || D.kinds.win || D.kinds.nf || D.kinds.f2b || D.kinds.ids;
+const hasPackets = () => !D.waf || D.kinds.ufw || D.kinds.opn || D.kinds.win || D.kinds.nf || D.kinds.f2b || D.kinds.ids || D.kinds.vpc || D.kinds.azure;
 const EV_COLS = [
   { id: 'time', label: 'Time' },
   { id: 'act', label: 'Action', rank: () => { const r = byLabel(D.act.list, i => D.act.list[i]); return i => r[D.c.act[i]]; } },
@@ -3697,7 +3974,7 @@ function saveReport() {
   const win = dash.querySelector('#newWin'); if (win) win.replaceWith(el('span', 'report-pick', live.querySelector('#newWin .on')?.textContent || ''));
   dash.querySelector('.filters')?.closest('.card')?.remove();
   dash.querySelector('#ev')?.closest('.card')?.remove();
-  dash.querySelector('#blockCard')?.remove(); dash.querySelector('#filesCard')?.remove();
+  dash.querySelector('#blockCard')?.remove(); dash.querySelector('#filesCard')?.remove(); dash.querySelector('#sinceCard')?.remove();
   dash.querySelectorAll('button, input, .hint, #tip').forEach(e => e.remove());
   dash.querySelectorAll('[title="Filter to this source"]').forEach(e => e.removeAttribute('title'));
   dash.querySelectorAll('#wiTable tr').forEach(e => e.classList.remove('pick'));
@@ -3938,6 +4215,38 @@ function makeSample() {
 
 /* ============================================================ wiring */
 $('#btnOpen').onclick = () => $('#file').click();
+// Open logs ▾: a folder, or pasted lines
+(function openMenu() {
+  const menu = $('#openMenu'), caret = $('#btnOpenMore');
+  const show = on => { menu.hidden = !on; caret.setAttribute('aria-expanded', on ? 'true' : 'false'); if (on) menu.querySelector('button').focus(); };
+  caret.onclick = e => { e.stopPropagation(); show(menu.hidden); };
+  menu.addEventListener('click', () => show(false));
+  document.addEventListener('click', e => { if (!menu.hidden && !menu.contains(e.target)) show(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) { show(false); caret.focus(); } });
+})();
+$('#btnTry').onclick = () => $('#btnSample').click();
+// "Get your logs": one format at a time, remembered
+(function formatTabs() {
+  const tabs = [...document.querySelectorAll('.fmt-tabs button')], panels = [...document.querySelectorAll('.fmt-panel')];
+  const pick = (f, focus) => {
+    if (!tabs.some(t => t.dataset.f === f)) f = tabs[0].dataset.f;
+    for (const t of tabs) { const on = t.dataset.f === f; t.setAttribute('aria-selected', on ? 'true' : 'false'); t.tabIndex = on ? 0 : -1; if (on && focus) t.focus(); }
+    for (const p of panels) p.hidden = p.dataset.f !== f;
+    try { localStorage.setItem('fwscope-fmt', f); } catch {}
+  };
+  tabs.forEach((t, i) => {
+    t.id = 'tab-' + t.dataset.f; panels.find(p => p.dataset.f === t.dataset.f)?.setAttribute('aria-labelledby', t.id);
+    t.onclick = () => pick(t.dataset.f);
+    t.onkeydown = e => { const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (d) { e.preventDefault(); pick(tabs[(i + d + tabs.length) % tabs.length].dataset.f, true); } };
+  });
+  let saved = ''; try { saved = localStorage.getItem('fwscope-fmt') || ''; } catch {}
+  pick(saved);
+})();
+$('#btnReopen').onclick = () => reopenSession();
+$('#btnForgetVisits').onclick = () => forgetVisits();
+$('#btnForget').onclick = () => forgetSession();
+$('#optRemember').onchange = e => { SESSION.on = e.target.checked; try { localStorage.setItem('fwscope-remember', SESSION.on ? '1' : '0'); } catch {} if (!SESSION.on) forgetSession(); else saveSession(); };
+(async () => { try { SESSION.info = await idbReq((await sessionStore('readonly')).get('info')) || null; } catch {} sessionStatus(); })();
 $('#btnFolder').onclick = () => $('#folder').click();
 $('#folder').onchange = e => { const f = [...e.target.files].filter(f => keepLog(f) && !/(^|\/)\./.test(f.webkitRelativePath || '')); e.target.value = ''; if (f.length) loadFiles(f); else alert('No log files in that folder.'); };
 $('#file').onchange = e => { loadFiles(e.target.files); e.target.value = ''; };
@@ -3953,7 +4262,7 @@ IDB.all().then(rows => {
 $('#btnPaste').onclick = () => { $('#pasteText').value = ''; $('#pasteDlg').showModal(); };
 $('#pasteCancel').onclick = () => $('#pasteDlg').close();
 $('#pasteGo').onclick = () => { const t = $('#pasteText').value; $('#pasteDlg').close(); if (t.trim()) loadText('pasted text', t); };
-$('#btnClear').onclick = () => { D = null; $('#btnOpen').textContent = 'Open logs'; $('#btnOpen').title = ''; $('#toast').hidden = true; $('#dash').hidden = true; $('#empty').hidden = false; $('#btnClear').hidden = true; $('#btnReport').hidden = true; F.range = null; F.preset = 'all'; F.acts = [true, true, true, true]; setQueryText(''); };
+$('#btnClear').onclick = () => { setTimeout(sessionStatus); D = null; $('#btnOpen').textContent = 'Open logs'; $('#btnOpen').title = ''; $('#toast').hidden = true; $('#dash').hidden = true; $('#empty').hidden = false; $('#btnClear').hidden = true; $('#btnReport').hidden = true; F.range = null; F.preset = 'all'; F.acts = [true, true, true, true]; setQueryText(''); };
 $('#btnReset').onclick = () => { setView(structuredClone(VIEW_DEFAULT)); if (D && D.n) { buildActChips(); setQuery(''); } else saveView(); };
 function setQueryText(q) { $('#q').value = q; F.q = q; F.preds = []; $('#qerr').textContent = ''; }
 // drag & drop anywhere on the page
