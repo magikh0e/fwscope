@@ -209,6 +209,9 @@ tr:hover .cp, .cp:focus-visible { opacity: 1; }
 #blockTable .why2 { color: var(--ink-2); font-size: 12px; }
 .block-foot { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
 #blockAllow { width: 320px; max-width: 100%; font-family: var(--mono); font-size: 12px; }
+#cmpTable td.up { color: var(--ink); }
+#cmpTable td.dn, #cmpTable td.gone { color: var(--muted); }
+#cmpTable .tag2 { font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--surface-2); color: var(--ink-2); margin-left: 6px; }
 .newnote { background: var(--surface-2); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; color: var(--ink-2); margin-bottom: 10px; }
 
 /* map */
@@ -292,6 +295,9 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
           <li>Run both in an admin PowerShell. Logging is off by default; the first line turns on logging of dropped packets.</li>
           <li>Rename each copy after its PC (<code>office-pc.log</code>): the log has no hostname, so the file name is used.</li>
         </ul>
+        <p style="margin:8px 0 4px">For <b>program names</b>, export the Security log's firewall events instead (needs auditing on, first line):</p>
+        <pre>auditpol /set /subcategory:"Filtering Platform Connection" /success:enable /failure:enable</pre>
+        <pre>Get-WinEvent -FilterHashtable @{LogName='Security';Id=5152,5156,5157} -MaxEvents 200000 | % { $x=[xml]$_.ToXml(); $d=[ordered]@{EventID=$_.Id;TimeCreated=$_.TimeCreated.ToUniversalTime().ToString('o');Computer=$_.MachineName}; $x.Event.EventData.Data | % { $d[$_.Name]=$_.'#text' }; $d | ConvertTo-Json -Compress } | Set-Content -Encoding utf8 "$HOME\Desktop\$env:COMPUTERNAME-wfp.json"</pre>
         <h3>ModSecurity / Coraza</h3>
         <pre>scp 'you@web:/var/log/modsec_audit.log*' .</pre>
         <pre>grep 'ModSecurity:' /var/log/nginx/error.log &gt; modsec-errors.log</pre>
@@ -413,6 +419,16 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
       <div class="hint">First seen in that window and never earlier in the loaded logs, within the current filter (try <code>dpt:22</code> for new SSH sources). Click to filter. Shift-click to exclude.</div>
     </div>
 
+    <div class="card" id="cmpCard">
+      <div class="card-head"><h2>Compare the last</h2>
+        <div class="seg" id="cmpWin"><button data-w="1h">hour</button><button data-w="24h" class="on">day</button><button data-w="7d">week</button></div>
+        <span class="sub">with the one before, by</span><select id="cmpDim"></select>
+        <span class="grow"></span><span class="sub" id="cmpSub"></span></div>
+      <div class="newnote" id="cmpNote" hidden></div>
+      <div class="tbl-wrap"><table id="cmpTable"></table></div>
+      <div class="hint">Both periods end at the newest event loaded and use the current filter (its time range aside). Sorted by the size of the change. Click a row to filter to it.</div>
+    </div>
+
     <div class="grid2">
       <div class="card" data-rank="A">
         <div class="card-head"><h2>Top</h2><select class="dimSel"></select><span class="grow"></span><span class="sub rankSub"></span></div>
@@ -443,8 +459,8 @@ dialog .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1
         <label class="tog">Script for <select id="blockFmt">
           <option value="ufw">UFW</option><option value="ipset">iptables + ipset</option><option value="nft">nftables</option>
           <option value="opnalias">OPNsense alias list</option><option value="opnapi">OPNsense API script</option>
-          <option value="win">Windows Firewall</option><option value="modsec">ModSecurity</option></select></label>
-        <button id="btnBlock">Write script</button></div>
+          <option value="win">Windows Firewall</option><option value="modsec">ModSecurity</option><option value="cloudflare">Cloudflare (IP access rules)</option></select></label>
+        <button id="btnBlock">Write script</button><button id="btnF2b" title="Draft fail2ban jails and filters for the patterns in these logs, so bans happen on their own from now on">Draft fail2ban</button></div>
       <div class="tbl-wrap"><table id="blockTable"></table></div>
       <div class="block-foot">
         <label class="tog" title="Addresses or ranges that are never suggested, e.g. your office, monitoring or VPN. Comma or space separated, CIDR allowed. Kept in this browser.">Never block
@@ -688,6 +704,7 @@ const asnLabel = k => D.asnOrg[k] || D.asn.list[k];
 
 /* ============================================================ store (columnar) */
 class Intern { constructor() { this.map = new Map(); this.list = []; } id(s) { let i = this.map.get(s); if (i === undefined) { i = this.list.length; this.list.push(s); this.map.set(s, i); } return i; } }
+const ACOLS = { app: Uint32Array };
 const COLS = { ts: Float64Array, act: Uint8Array, src: Uint32Array, dst: Uint32Array, spt: Int32Array, dpt: Int32Array, proto: Uint8Array, iin: Uint16Array, iout: Uint16Array, len: Int32Array, ttl: Int16Array, flags: Uint16Array, itype: Int16Array, icode: Int16Array, host: Uint16Array, mac: Uint32Array, rule: Uint16Array };
 let D;
 function resetStore() {
@@ -695,17 +712,18 @@ function resetStore() {
         actGroup: [], files: [], kinds: {}, dupes: 0, skipped: 0, lines: 0, noTime: 0, prior: [], order: null, ipc: null, minTs: NaN, maxTs: NaN };
   D.iface.id(''); D.host.id(''); D.mac.id(''); D.ip.id(''); D.rule.id('');
   // WAF: interned web fields; rule combos (one per distinct set of rule ids) carry their rules and attack categories
+  D.hasApp = false; D.app = new Intern(); D.app.id('');
   D.waf = false; D.whost = new Intern(); D.uri = new Intern(); D.path = new Intern(); D.method = new Intern(); D.ua = new Intern();
   D.wcombo = new Intern(); D.wrule = new Intern(); D.wcat = new Intern(); D.wmsg = new Map(); D.wcatOf = new Map();
   for (const x of [D.whost, D.uri, D.path, D.method, D.ua, D.wcombo]) x.id('');
-  D.wcomboRules = [[]]; D.wcomboCats = [0]; D.wcomboCatList = [[]]; D.viaCf = 0; D.viaProxy = 0; D.cfgIn = new Map(); D.cfgOut = new Map(); D.scoreEst = 0; D.wruleSev = new Map();
+  D.wcomboRules = [[]]; D.wcomboCats = [0]; D.wcomboCatList = [[]]; D.viaCf = 0; D.viaProxy = 0; D.wafFmt = new Set(); D.cfgIn = new Map(); D.cfgOut = new Map(); D.scoreEst = 0; D.wruleSev = new Map();
   grow(1 << 14);
 }
 const ROW_BYTES = Object.values(COLS).reduce((s, T) => s + T.BYTES_PER_ELEMENT, 0);
 // A browser tab runs out of memory somewhere past this; stop loading cleanly instead.
 const MAX_EVENTS = 20e6;
 function grow(cap) {
-  for (const [k, T] of Object.entries(D.waf ? { ...COLS, ...WCOLS } : COLS)) { const a = new T(cap); if (D.c[k]) a.set(D.c[k].subarray(0, D.n)); D.c[k] = a; }
+  for (const [k, T] of Object.entries({ ...COLS, ...(D.waf ? WCOLS : {}), ...(D.hasApp ? ACOLS : {}) })) { const a = new T(cap); if (D.c[k]) a.set(D.c[k].subarray(0, D.n)); D.c[k] = a; }
   D.cap = cap;
 }
 const nextCap = cap => cap < 4194304 ? cap * 2 : Math.ceil(cap * 1.5);
@@ -867,6 +885,7 @@ function handleJson(line, ctx) {
 }
 function handleObj(o, ctx) {
   if (!o || typeof o !== 'object') return;
+  if ((o.EventID || o.Id) && WFP_EVENTS[+(o.EventID || o.Id)] && ('DestAddress' in o || 'SourceAddress' in o)) { D.lines++; winSecEvent(o, ctx); return; }
   if (o.transaction && typeof o.transaction === 'object') { D.lines++; if ('client_ip' in o.transaction) modsecV3(o, ctx); else modsecV2(o, ctx); return; }
   if (typeof o.MESSAGE === 'string') { // journalctl -o json
     const ts = o.__REALTIME_TIMESTAMP ? +o.__REALTIME_TIMESTAMP / 1000 : NaN, host = o._HOSTNAME || '';
@@ -895,11 +914,12 @@ function addRow(r, ctx) {
   c.len[n] = r.len ?? -1; c.ttl[n] = r.ttl ?? -1; c.flags[n] = r.flags || 0;
   c.itype[n] = r.itype ?? -1; c.icode[n] = r.icode ?? -1;
   c.host[n] = D.host.id(r.host || ''); c.mac[n] = D.mac.id(r.mac || ''); c.rule[n] = D.rule.id(r.rule || '');
+  if (D.hasApp) D.c.app[n] = r.app ? D.app.id(r.app) : 0;
   if (D.waf) {
     const w = r.w;
     c.whost[n] = w ? D.whost.id(w.host) : 0; c.uri[n] = w ? D.uri.id(w.uri) : 0; c.path[n] = w ? D.path.id(w.path) : 0;
     c.method[n] = w ? D.method.id(w.method) : 0; c.status[n] = w ? w.status : -1; c.wr[n] = w ? w.combo : 0;
-    c.sev[n] = w ? w.sev : -1; c.score[n] = w ? w.score : -1; c.oscore[n] = w ? w.oscore : -1; c.ua[n] = w ? D.ua.id(w.ua) : 0;
+    c.sev[n] = w ? w.sev : -1; c.score[n] = w ? w.score : -1; c.oscore[n] = w ? w.oscore : -1; c.ua[n] = w ? D.ua.id(w.ua) : 0; c.via[n] = w ? w.via : 0;
   }
 }
 
@@ -908,7 +928,7 @@ function addRow(r, ctx) {
    src, server as dst, ports, action, logging host) and adds web columns, allocated only once WAF data loads.
    Formats: libmodsecurity v3 JSON audit log, mod_security2 JSON audit log, the native (multi-part) audit
    log, and "ModSecurity:" lines in Apache / nginx error logs (grouped per request by unique_id). */
-const WCOLS = { whost: Uint16Array, uri: Uint32Array, path: Uint32Array, method: Uint8Array, status: Int16Array, wr: Uint32Array, sev: Int8Array, score: Int16Array, oscore: Int16Array, ua: Uint32Array };
+const WCOLS = { whost: Uint16Array, uri: Uint32Array, path: Uint32Array, method: Uint8Array, status: Int16Array, wr: Uint32Array, sev: Int8Array, score: Int16Array, oscore: Int16Array, ua: Uint32Array, via: Uint8Array };
 function enableWaf() {
   if (D.waf) return;
   D.waf = true;
@@ -983,9 +1003,9 @@ const inCloudflare = ip => { if (!cfMatch) { const ms = CF_RANGES.map(ipMatcher)
 const validIp = x => !!x && !!ipBits(x.trim());
 function realClient(ev, headers) {
   const cf = headerOf(headers, 'cf-connecting-ip').trim();
-  if (cf && validIp(cf) && inCloudflare(ev.src)) { ev.via = ev.src; ev.src = cf; D.viaCf++; return; }
+  if (cf && validIp(cf) && inCloudflare(ev.src)) { ev.via = ev.src; ev.viaKind = 1; ev.src = cf; D.viaCf++; return; }
   const xff = headerOf(headers, 'x-forwarded-for').split(',')[0].trim();
-  if (xff && validIp(xff) && ev.src && (ipClass(ev.src) & 1)) { ev.via = ev.src; ev.src = xff; D.viaProxy++; }
+  if (xff && validIp(xff) && ev.src && (ipClass(ev.src) & 1)) { ev.via = ev.src; ev.viaKind = 2; ev.src = xff; D.viaProxy++; }
 }
 // one normalised WAF event -> a row
 function wafEvent(ev, ctx) {
@@ -1031,10 +1051,11 @@ function wafEvent(ev, ctx) {
   const uri = ev.uri || '', path = uri.split('?')[0];
   addRow({ ts: ev.ts, host: wafHostName(ctx), act: ev.intercepted ? 'WAF BLOCK' : 'WAF DETECT', proto: 'HTTP',
     src: ev.src, spt: ev.spt, dst: ev.dst, dpt: ev.dpt,
-    w: { host: ev.site || '', uri, path, method: (ev.method || '').toUpperCase(), status: ev.status ?? -1, combo: ci, sev, score, oscore, ua: ev.ua || '' } }, ctx);
+    w: { host: ev.site || '', uri, path, method: (ev.method || '').toUpperCase(), status: ev.status ?? -1, combo: ci, sev, score, oscore, ua: ev.ua || '', via: ev.viaKind || 0 } }, ctx);
 }
 // libmodsecurity v3 JSON (one object per line)
 function modsecV3(o, ctx) {
+  D.wafFmt.add('v3');
   const t = o.transaction, rq = t.request || {}, rs = t.response || {};
   const msgs = (t.messages || []).map(m => { const d = m.details || {}; return { id: d.ruleId, msg: m.message, sev: d.severity, tags: d.tags }; });
   const status = rs.http_code != null ? +rs.http_code : -1;
@@ -1045,6 +1066,7 @@ function modsecV3(o, ctx) {
 }
 // mod_security2 JSON (SecAuditLogFormat JSON)
 function modsecV2(o, ctx) {
+  D.wafFmt.add('apache');
   const t = o.transaction, rq = o.request || {}, rs = o.response || {}, ad = o.audit_data || {};
   const [method, uri] = (rq.request_line || '').split(' ');
   const msgs = (ad.messages || []).map(s => { const f = modsecFields(s); return { id: f.id, msg: f.msg || s.split(' [')[0], sev: f.severity, tags: f.tags }; });
@@ -1066,6 +1088,7 @@ function nativeLine(line, ctx) {
   return true;
 }
 function nativeFlush(ctx) {
+  D.wafFmt.add('apache');
   const r = ctx.nrec; ctx.nrec = null; ctx.nsec = null;
   if (!r || !r.A) return;
   const a = /^\[([^\]]+)\]\s+(\S+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)/.exec(r.A[0] || '');
@@ -1082,6 +1105,7 @@ function nativeFlush(ctx) {
 }
 // error log lines: one line per rule hit; lines of one request share a unique_id
 function modsecErrorLine(line, ctx) {
+  D.wafFmt.add(/^\[\w{3} /.test(line) ? 'apache' : 'nginx');
   const f = modsecFields(line);
   const body = line.slice(line.indexOf('ModSecurity:') + 12).trim();
   let ts = NaN, src = '', spt, method = '', uri = f.uri || '', site = f.hostname || '';
@@ -1163,6 +1187,30 @@ function opnApiObj(o, ctx) {
   addRow(r, ctx);
 }
 
+/* ---------- Windows Security log: Filtering Platform events, exported as JSON lines (see the start screen)
+   5156 connection allowed, 5157 connection blocked, 5152 packet dropped. In these events "Source" is always the
+   local side and "Dest" the remote one, whatever the direction, so inbound events are flipped to remote -> local. */
+const WFP_EVENTS = { 5156: 'ALLOW', 5157: 'BLOCK', 5152: 'DROP' };
+function enableApp() {
+  if (D.hasApp) return;
+  D.hasApp = true; D.c.app = new Uint32Array(D.cap);
+}
+function winSecEvent(o, ctx) {
+  D.kinds.win = 1;
+  const id = +o.EventID || +o.Id, act = WFP_EVENTS[id]; if (!act) return;
+  const ts = Date.parse(o.TimeCreated || o.TimeCreatedUtc || '');
+  const dir = String(o.Direction || ''), inbound = /14592|inbound/i.test(dir);
+  const la = o.SourceAddress, lp = +o.SourcePort, ra = o.DestAddress, rp = +o.DestPort;
+  const app = String(o.Application || '').replace(/^\\device\\harddiskvolume\d+\\/i, 'C:\\');
+  const name = app ? app.split('\\').pop() : '';
+  if (isDup(ts, [id, dir, la, lp, ra, rp, o.Protocol, o.ProcessID || o.ProcessId].join(','), ctx)) return;
+  if (name) enableApp();
+  const p = String(o.Protocol || ''), proto = PROTO_NUM[p] || (p ? 'proto ' + p : '?');
+  const host = o.Computer || o.MachineName || wfHostName(ctx);
+  addRow(inbound
+    ? { ts, host, act, proto, src: ra, spt: rp, dst: la, dpt: lp, iin: 'receive', app: name }
+    : { ts, host, act, proto, src: la, spt: lp, dst: ra, dpt: rp, iout: 'send', app: name }, ctx);
+}
 function ufwMsg(msg, ts, host, ctx) {
   D.kinds.ufw = 1;
   const i = msg.indexOf('[UFW ');
@@ -1342,6 +1390,7 @@ function finish() {
   D.ipSeen = new Uint8Array(D.ip.list.length);
   for (let i = 0; i < D.n; i++) D.ipSeen[D.c.src[i]] |= D.actWaf[D.c.act[i]] ? 2 : 1;
   D.both = D.waf && (D.kinds.ufw || D.kinds.opn || D.kinds.win);
+  D.wafRows = 0; if (D.waf) for (let i = 0; i < D.n; i++) if (D.actWaf[D.c.act[i]]) D.wafRows++;
   D.hasRules = D.rule.list.length > 1;
   $('#empty').hidden = true; $('#dash').hidden = false; $('#btnClear').hidden = false; $('#btnReport').hidden = false;
   F.page = 0;
@@ -1391,7 +1440,7 @@ function numMatcher(v) {
 // precompute a lookup table over an interned string list
 const table = (intern, fn) => Uint8Array.from(intern.list, s => fn(s) ? 1 : 0);
 
-const FIELDS = ['src','dst','ip','spt','dpt','port','proto','in','out','iface','host','mac','act','action','flag','type','ttl','len','rule','cc','country','asn','org','site','path','uri','method','status','wrule','attack','sev','ua','seen','score','rdns'];
+const FIELDS = ['src','dst','ip','spt','dpt','port','proto','in','out','iface','host','mac','act','action','flag','type','ttl','len','rule','cc','country','asn','org','site','path','uri','method','status','wrule','attack','sev','ua','seen','score','rdns','app'];
 function compileQuery(q) {
   const preds = [];
   const c = D.c;
@@ -1429,6 +1478,10 @@ function compileQuery(q) {
       }
       case 'rule': { const m = strMatcher(v), l = v.toLowerCase(), words = l.replace(/_/g, ' '); const T = Uint8Array.from(D.rule.list, s => s && (m(s) || s.toLowerCase().startsWith(l) || (ruleLabel(s) || '').toLowerCase().includes(words)) ? 1 : 0); p = i => T[c.rule[i]]; break; }
       case 'host': { const T = table(D.host, strMatcher(v)); p = i => T[c.host[i]]; break; }
+      case 'app': {
+        if (!D.hasApp) throw new Error('app: needs Windows Security log events (5152/5156/5157)');
+        const m = strMatcher(v); const T = table(D.app, x => !!x && (m(x) || m(x.replace(/\.exe$/i, '')))); p = i => T[c.app[i]]; break;
+      }
       case 'rdns': {
         // sources whose reverse DNS name matches; only addresses that have been looked up can match
         if (!RDNS.provider && !RDNS.cache.size) throw new Error('rdns: needs Hostnames turned on (filter bar)');
@@ -1499,14 +1552,14 @@ function compileQuery(q) {
 }
 
 /* ============================================================ filter state */
-const F = { preset: 'all', range: null, acts: [true, true, true, true], q: '', preds: [], hideNoise: false, publicOnly: false, page: 0, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false, blockT: 0 };
+const F = { preset: 'all', range: null, acts: [true, true, true, true], q: '', preds: [], hideNoise: false, publicOnly: false, page: 0, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false, blockT: 0, cmpWin: '24h', cmpDim: 'src' };
 let SEL = new Uint32Array(0);
 
 /* ============================================================ view state: kept in the page address and the browser
    #q=dpt:22&t=7d&a=1101&n=1&p=1&d=src,dpt,asn&o=1   (t is a preset or "from-to" in epoch ms)
    The address makes a view bookmarkable; local storage brings it back on the next visit.
    A zoomed time range is only kept in the address: it rarely fits the next set of logs. */
-const VIEW_DEFAULT = { preset: 'all', range: null, acts: [true, true, true, true], q: '', hideNoise: false, publicOnly: false, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false, blockT: 0 };
+const VIEW_DEFAULT = { preset: 'all', range: null, acts: [true, true, true, true], q: '', hideNoise: false, publicOnly: false, oldestFirst: false, dimA: 'src', dimB: 'dpt', dimC: 'asn', newWin: '24h', sort: '', dimsChosen: false, winChosen: false, blockT: 0, cmpWin: '24h', cmpDim: 'src' };
 function viewString(withRange) {
   const p = new URLSearchParams();
   if (F.q.trim()) p.set('q', F.q.trim());
@@ -1520,6 +1573,8 @@ function viewString(withRange) {
   if (F.winChosen) p.set('w', F.newWin);
   if (F.sort) p.set('s', F.sort);
   if (F.blockT) p.set('bt', F.blockT);
+  if (F.cmpWin !== '24h') p.set('cw', F.cmpWin);
+  if (F.cmpDim !== 'src') p.set('cd', F.cmpDim);
   return p.toString();
 }
 function readView(str) {
@@ -1532,6 +1587,8 @@ function readView(str) {
   if (NEW_WIN_KEYS.includes(p.get('w'))) { v.newWin = p.get('w'); v.winChosen = true; }
   v.dimsChosen = p.has('d');
   if (/^\d{1,3}$/.test(p.get('bt') || '')) v.blockT = +p.get('bt');
+  if (CMP_KEYS.includes(p.get('cw'))) v.cmpWin = p.get('cw');
+  if (DIM_KEYS.includes(p.get('cd'))) v.cmpDim = p.get('cd');
   if (/^-?(act|host|in|out|proto|src|cc|spt|dst|dpt|len|ttl|rule)$/.test(p.get('s') || '')) v.sort = p.get('s');
   v.hideNoise = p.get('n') === '1'; v.publicOnly = p.get('p') === '1'; v.oldestFirst = p.get('o') === '1';
   const d = (p.get('d') || '').split(',');
@@ -1539,8 +1596,8 @@ function readView(str) {
   return v;
 }
 // dimension keys, known before DIMS is defined further down
-const NEW_WIN_KEYS = ['1h', '24h', '7d'];
-const DIM_KEYS = ['src', 'src24', 'cc', 'asn', 'dst', 'dpt', 'spt', 'proto', 'iin', 'iout', 'icmp', 'mac', 'host', 'rule', 'act', 'attack', 'wrule', 'site', 'path', 'status', 'method', 'sev', 'ua'];
+const NEW_WIN_KEYS = ['1h', '24h', '7d'], CMP_KEYS = ['1h', '24h', '7d'];
+const DIM_KEYS = ['app', 'src', 'src24', 'cc', 'asn', 'dst', 'dpt', 'spt', 'proto', 'iin', 'iout', 'icmp', 'mac', 'host', 'rule', 'act', 'attack', 'wrule', 'site', 'path', 'status', 'method', 'sev', 'ua'];
 function setView(v) {
   Object.assign(F, v, { page: 0 });
   $('#q').value = F.q; $('#qerr').textContent = '';
@@ -1699,7 +1756,7 @@ const groupRows = (counts, total) => {
 /* ============================================================ render: tiles */
 function renderAll() {
   hideTip(); syncPresets();
-  namesStatus(); rdnsStatus(); renderTiles(); renderTimeline(); renderMap(); renderWhatIf(); renderTuning(); renderNew(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderBlock(); renderEvents();
+  namesStatus(); rdnsStatus(); renderTiles(); renderTimeline(); renderMap(); renderWhatIf(); renderTuning(); renderNew(); renderCompare(); renderRank('A'); renderRank('B'); renderHeat(); renderScans(); renderBlock(); renderEvents();
   const f = D.files.map(f => `${f.name} (${fmtN(f.events)}${f.partial ? ', stopped partway' : ''})`).join(', ');
   $('#foot').textContent = `${fmtN(D.n)} events from ${D.files.length} source${D.files.length > 1 ? 's' : ''}: ${f}.` +
     (D.dupes ? ` ${fmtN(D.dupes)} duplicate lines skipped.` : '') +
@@ -2089,6 +2146,7 @@ const DIMS = {
   host:  { label: 'Logging hosts', key: i => D.c.host[i], name: k => D.host.list[k] || '(unknown)', tok: k => D.host.list[k] ? 'host:' + D.host.list[k] : null },
   rule:  { label: 'Firewall rules (OPNsense)', key: i => D.c.rule[i], name: k => ruleName(D.rule.list[k]), sub: k => ruleLabel(D.rule.list[k]) ? D.rule.list[k].slice(0, 8) : '', tok: k => 'rule:' + D.rule.list[k], skip: k => k === 0 },
   act:   { label: 'Actions (exact tag)', key: i => D.c.act[i], name: k => D.act.list[k], tok: k => 'act:' + D.act.list[k].replace(/ /g, '_') },
+  app:   { label: 'Programs (Windows)', key: i => D.c.app[i], name: k => D.app.list[k], tok: k => /\s/.test(D.app.list[k]) ? null : 'app:' + D.app.list[k], skip: k => k === 0 },
   attack: { label: 'Attack types (WAF)', multi: i => D.wcomboCatList[D.c.wr[i]], name: k => D.wcat.list[k], tok: k => 'attack:' + D.wcat.list[k].replace(/ /g, '_') },
   wrule: { label: 'WAF rules', multi: i => D.wcomboRules[D.c.wr[i]], name: k => D.wmsg.get(D.wrule.list[k]) || 'rule ' + D.wrule.list[k], sub: k => D.wrule.list[k], tok: k => 'wrule:' + D.wrule.list[k], skip: k => isScoreRule(D.wrule.list[k]) },
   site:  { label: 'Sites (WAF)', key: i => D.c.whost[i], name: k => D.whost.list[k], tok: k => 'site:' + D.whost.list[k], skip: k => k === 0 },
@@ -2168,6 +2226,7 @@ function renderRank(id) {
 // anything for these logs (rules without OPNsense, countries without GeoIP ...).
 function dimApplies(k) {
   if (['attack', 'wrule', 'site', 'path', 'status', 'method', 'sev', 'ua'].includes(k)) return D.waf;
+  if (k === 'app') return D.hasApp;
   if (k === 'rule') return D.hasRules;
   if (k === 'cc') return D.geo && D.cc.list.length > 0;
   if (k === 'asn') return D.geo && D.asn.list.length > 0;
@@ -2183,6 +2242,7 @@ function autoView() {
     : D.waf ? { dimA: 'src', dimB: 'host' }
     : kinds > 1 || hosts > 1 ? { dimA: 'host', dimB: 'dpt' }
     : D.kinds.opn && D.hasRules ? { dimA: 'src', dimB: 'rule' }
+    : D.hasApp ? { dimA: 'app', dimB: 'dpt' }
     : { dimA: 'src', dimB: 'dpt' };
   auto.dimC = dimApplies('asn') ? 'asn' : dimApplies('cc') ? 'cc' : 'asn';
   for (const k of ['dimA', 'dimB', 'dimC']) if (!F.dimsChosen || !dimApplies(F[k])) F[k] = auto[k];
@@ -2489,6 +2549,54 @@ function renderNew() {
 }
 $('#newWin').addEventListener('click', e => { const w = e.target.dataset.w; if (!w || w === F.newWin) return; F.newWin = w; F.winChosen = true; renderNew(); saveView(); });
 
+/* ============================================================ render: compare two periods
+   The last hour / day / week against the one before it, both ending at the newest event, on the current filter
+   without its time window (NEWBASE). Grouped by any Top-list dimension; sorted by the absolute change. */
+const CMP_WIN = { '1h': 36e5, '24h': 864e5, '7d': 6048e5 };
+const CMP_NAME = { '1h': 'hour', '24h': 'day', '7d': 'week' };
+function renderCompare() {
+  for (const b of $('#cmpWin').children) b.classList.toggle('on', b.dataset.w === F.cmpWin);
+  const sel = $('#cmpDim');
+  if (!sel.options.length) for (const [k, d] of Object.entries(DIMS)) { const o = el('option', null, d.label); o.value = k; sel.append(o); }
+  for (const o of sel.options) o.disabled = !dimApplies(o.value);
+  if (!dimApplies(F.cmpDim)) F.cmpDim = 'src';
+  sel.value = F.cmpDim;
+  const dim = DIMS[F.cmpDim], c = D.c, L = CMP_WIN[F.cmpWin], end = D.maxTs + 1, aS = end - L, bS = end - 2 * L;
+  const cnt = new Map(); let ta = 0, tb2 = 0;
+  for (const i of NEWBASE) {
+    const t = c.ts[i]; if (!(t >= bS)) continue;
+    const w = t >= aS ? 1 : 0; if (w) ta++; else tb2++;
+    for (const k of dim.multi ? dim.multi(i) : [dim.key(i)]) {
+      if (dim.skip && dim.skip(k)) continue;
+      let v = cnt.get(k); if (!v) cnt.set(k, v = [0, 0]); v[w]++;
+    }
+  }
+  const pct = (a, b) => b ? `${a >= b ? '+' : '−'}${Math.abs(Math.round(100 * (a - b) / b))}%` : '';
+  const name = CMP_NAME[F.cmpWin];
+  $('#cmpSub').textContent = `${fmtN(tb2)} → ${fmtN(ta)} events${tb2 ? ` (${pct(ta, tb2)})` : ''}`;
+  const note = $('#cmpNote'), span = D.maxTs - D.minTs;
+  note.hidden = span >= 2 * L;
+  note.textContent = span < L ? `The loaded logs cover less than a ${name}, so there's nothing before to compare with. Pick a shorter period or load older logs.` : `The loaded logs only cover ${fmtDur(span)}, so the earlier ${name} is incomplete.`;
+  const rows = [...cnt].sort((x, y) => Math.abs(y[1][1] - y[1][0]) - Math.abs(x[1][1] - x[1][0]) || y[1][1] - x[1][1]).slice(0, 15);
+  const tb = $('#cmpTable'); tb.textContent = '';
+  if (!rows.length) { const tr = el('tr'); tr.append(el('td', null, `No events in the last two ${name}s for this filter.`)); tb.append(tr); return; }
+  const hr = el('tr'); for (const h of [dim.label.replace(/ \(.*\)$/, ''), `Previous ${name}`, `Last ${name}`, 'Change']) hr.append(el('th', null, h)); tb.append(hr);
+  for (const [k, [b, a]] of rows) {
+    const tr = el('tr', 'clk');
+    const lbl = el('td', dim.ip ? 'mono' : null, dim.name(k)); const sub = dim.sub && dim.sub(k); if (sub) lbl.append(' ', el('small', 'why', sub));
+    if (dim.ip) rdnsTag(lbl, D.ip.list[k], F.cmpDim !== 'dst');
+    const ch = el('td', a > b ? 'up' : a < b ? (a ? 'dn' : 'gone') : null);
+    ch.textContent = b === 0 ? `+${fmtN(a)}` : a === 0 ? `−${fmtN(b)}` : `${a >= b ? '+' : '−'}${fmtN(Math.abs(a - b))} (${pct(a, b)})`;
+    if (b === 0) ch.append(el('span', 'tag2', 'new')); else if (a === 0) ch.append(el('span', 'tag2', 'gone'));
+    tr.append(lbl, el('td', null, fmtN(b)), el('td', null, fmtN(a)), ch);
+    const tok = dim.tok && dim.tok(k);
+    if (tok) { tr.onclick = e => addToken(tok, e.shiftKey); keyable(tr, `${dim.name(k)}: ${fmtN(b)} then ${fmtN(a)}`, e => addToken(tok, e.shiftKey)); }
+    tb.append(tr);
+  }
+}
+$('#cmpWin').addEventListener('click', e => { const w = e.target.dataset.w; if (!w || w === F.cmpWin) return; F.cmpWin = w; renderCompare(); saveView(); });
+$('#cmpDim').onchange = e => { F.cmpDim = e.target.value; renderCompare(); saveView(); };
+
 /* ============================================================ render: heatmap */
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 function renderHeat() {
@@ -2640,6 +2748,7 @@ const EV_COLS = [
   { id: 'len', label: 'Len', when: hasPackets, rank: () => i => D.c.len[i] },
   { id: 'ttl', label: 'TTL', when: hasPackets, rank: () => i => D.c.ttl[i] },
   { id: 'flags', label: 'Flags / ICMP', when: hasPackets },
+  { id: 'app', label: 'Program', when: () => D.hasApp, rank: () => { const r = byLabel(D.app.list, i => D.app.list[i]); return i => D.c.app[i] ? r[D.c.app[i]] : -1; } },
   { id: 'site', label: 'Site', when: () => D.waf, rank: () => { const r = byLabel(D.whost.list, i => D.whost.list[i]); return i => D.c.whost[i] ? r[D.c.whost[i]] : -1; } },
   { id: 'req', label: 'Request', when: () => D.waf, rank: () => { const r = byLabel(D.uri.list, i => D.uri.list[i], true); return i => D.c.uri[i] ? r[D.c.uri[i]] : -1; } },
   { id: 'status', label: 'Status', when: () => D.waf, rank: () => i => D.c.status[i] },
@@ -2679,6 +2788,7 @@ function eventLine(i) {
   if (c.ttl[i] >= 0) parts.push('ttl=' + c.ttl[i]);
   if (c.flags[i]) parts.push('flags=' + flagStr(c.flags[i]).replace(/ /g, ','));
   if (proto.startsWith('ICMP') && c.itype[i] >= 0) parts.push(`icmp=${c.itype[i]}/${c.icode[i]}`);
+  if (D.hasApp && c.app[i]) parts.push('program=' + D.app.list[c.app[i]]);
   if (D.waf && c.wr[i]) {
     if (D.whost.list[c.whost[i]]) parts.push('site=' + D.whost.list[c.whost[i]]);
     parts.push(`"${D.method.list[c.method[i]] || '-'} ${D.uri.list[c.uri[i]] || '-'}"`);
@@ -2745,6 +2855,7 @@ function renderEvents() {
       case 'len': td(c.len[i] >= 0 ? String(c.len[i]) : ''); break;
       case 'ttl': td(c.ttl[i] >= 0 ? String(c.ttl[i]) : ''); break;
       case 'flags': { let extra = flagStr(c.flags[i]); if (proto.startsWith('ICMP') && c.itype[i] >= 0) extra = `type ${c.itype[i]}/${c.icode[i]} ${icmpName(proto, c.itype[i])}`; td(extra, 'mono'); break; }
+      case 'app': { const a2 = D.app.list[c.app[i]]; td(a2, 'mono', a2 && !/\s/.test(a2) ? 'app:' + a2 : null); break; }
       case 'site': { const h = D.whost.list[c.whost[i]]; td(h, null, h ? 'site:' + h : null); break; }
       case 'req': { const u = D.uri.list[c.uri[i]], m = D.method.list[c.method[i]], pth = D.path.list[c.path[i]]; const d = td(u ? (m ? m + ' ' : '') + (u.length > 70 ? u.slice(0, 69) + '…' : u) : '', 'mono', pth && !/\s/.test(pth) ? 'path:' + pth : null); if (u) d.title = u; break; }
       case 'status': td(c.status[i] >= 0 ? String(c.status[i]) : '', null, c.status[i] >= 0 ? 'status:' + c.status[i] : null); break;
@@ -2785,14 +2896,14 @@ function download(name, text, type = 'text/plain') {
 }
 const csvCell = s => /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 $('#btnCsv').onclick = () => {
-  const c = D.c, withRdns = RDNS.cache.size > 0, lines = ['time_iso,action,host,in,out,proto,src,spt,dst,dpt,len,ttl,flags,icmp_type,icmp_code,src_mac' + (D.geo ? ',src_country,src_asn,src_org' : '') + (withRdns ? ',src_rdns' : '')];
+  const c = D.c, withRdns = RDNS.cache.size > 0, lines = ['time_iso,action,host,in,out,proto,src,spt,dst,dpt,len,ttl,flags,icmp_type,icmp_code,src_mac' + (D.geo ? ',src_country,src_asn,src_org' : '') + (withRdns ? ',src_rdns' : '') + (D.hasApp ? ',program' : '')];
   for (let k = 0; k < SEL.length; k++) {
     const i = SEL[k], t = c.ts[i];
     lines.push([t === t ? new Date(t).toISOString() : '', D.act.list[c.act[i]], D.host.list[c.host[i]], D.iface.list[c.iin[i]], D.iface.list[c.iout[i]], D.proto.list[c.proto[i]],
       D.ip.list[c.src[i]], c.spt[i] >= 0 ? c.spt[i] : '', D.ip.list[c.dst[i]], c.dpt[i] >= 0 ? c.dpt[i] : '', c.len[i] >= 0 ? c.len[i] : '', c.ttl[i] >= 0 ? c.ttl[i] : '',
       flagStr(c.flags[i]), c.itype[i] >= 0 ? c.itype[i] : '', c.icode[i] >= 0 ? c.icode[i] : '', D.mac.list[c.mac[i]],
       ...(D.geo ? [D.ipCC[c.src[i]] >= 0 ? D.cc.list[D.ipCC[c.src[i]]] : '', D.ipAS[c.src[i]] >= 0 ? D.asnNum[D.ipAS[c.src[i]]] : '', D.ipAS[c.src[i]] >= 0 ? D.asnOrg[D.ipAS[c.src[i]]] || '' : ''] : []),
-      ...(withRdns ? [rdnsName(D.ip.list[c.src[i]])] : [])].map(v => csvCell(String(v))).join(','));
+      ...(withRdns ? [rdnsName(D.ip.list[c.src[i]])] : []), ...(D.hasApp ? [D.app.list[c.app[i]]] : [])].map(v => csvCell(String(v))).join(','));
   }
   download('ufw-events.csv', lines.join('\n') + '\n', 'text/csv');
 };
@@ -2943,12 +3054,12 @@ function blockCandidates() {
   const per = new Map(); let droppedOnly = 0;
   for (const i of SEL) {
     const src = c.src[i]; if (!D.ip.list[src] || (ipc[src] & 7)) continue;
-    let s = per.get(src); if (!s) per.set(src, s = { ports: new Map(), dsts: new Set(), paths: new Map(), uas: new Map(), n: 0, pn: 0, first: Infinity, last: -Infinity, reached: 0, waf: 0, attack: 0 });
+    let s = per.get(src); if (!s) per.set(src, s = { ports: new Map(), dsts: new Set(), paths: new Map(), uas: new Map(), n: 0, pn: 0, first: Infinity, last: -Infinity, reached: 0, waf: 0, attack: 0, cf: 0 });
     const t = c.ts[i], g = G[c.act[i]], isWaf = D.waf && D.actWaf[c.act[i]];
     s.n++;
     if (t === t) { if (t < s.first) s.first = t; if (t > s.last) s.last = t; }
     if (isWaf) {
-      s.waf++; s.uas.set(c.ua[i], (s.uas.get(c.ua[i]) || 0) + 1);
+      s.waf++; s.uas.set(c.ua[i], (s.uas.get(c.ua[i]) || 0) + 1); if (c.via[i] === 1) s.cf++;
       const v = s.paths.get(c.path[i]); if (v) v.n++; else s.paths.set(c.path[i], { n: 1, t });
       if (!D.act.list[c.act[i]].startsWith('WAF BLOCK')) s.reached++; // not intercepted: it reached the web app
       if ((D.wcomboRules[c.wr[i]] || []).some(r => { const id = D.wrule.list[r]; return !isScoreRule(id) && !/^9(11|20)\d{3}$/.test(id); })) s.attack++;
@@ -2981,7 +3092,8 @@ function blockCandidates() {
     if (!s.reached) { droppedOnly++; if (!blockShowDropped) continue; }
     if (s.reached) { score += 2; reasons.push(`${fmtN(s.reached)} request${s.reached > 1 ? 's' : ''} reached the web app`); }
     if (D.both && D.ipSeen[src] === 3) { score += 1; reasons.push('firewall + WAF'); }
-    out.push({ key: ip, ips: [ip], src, score, n: s.n, reached: s.reached, reasons, kinds: reasons.map(r => r.replace(/ \(.*\)$/, '').replace(/^\d[\d,]* /, '').replace(/ \d[\d,]*×$/, '').replace(/s$/, '')) });
+    if (s.cf) reasons.push(s.cf === s.waf ? 'via Cloudflare' : `via Cloudflare (${fmtN(s.cf)} of ${fmtN(s.waf)})`);
+    out.push({ key: ip, ips: [ip], src, score, n: s.n, reached: s.reached, cf: s.cf, reasons, kinds: reasons.map(r => r.replace(/ \(.*\)$/, '').replace(/^\d[\d,]* /, '').replace(/ \d[\d,]*×$/, '').replace(/s$/, '')) });
   }
   // ranges: 3+ candidates in one /24 or /64
   const bySub = new Map();
@@ -2991,7 +3103,7 @@ function blockCandidates() {
     const strong = g.filter(x => x.score >= 4);
     if (strong.length >= 3 && !never(sub.split('/')[0]) && !inCloudflare(sub.split('/')[0])) {
       const n = g.reduce((a, x) => a + x.n, 0), reached = g.reduce((a, x) => a + x.reached, 0);
-      final.push({ key: sub, ips: g.map(x => x.key), range: true, score: Math.max(...g.map(x => x.score)) + 1, n, reached,
+      final.push({ key: sub, ips: g.map(x => x.key), range: true, score: Math.max(...g.map(x => x.score)) + 1, n, reached, cf: g.reduce((a, x) => a + (x.cf || 0), 0),
         reasons: [`${g.length} attacking addresses in this range`].concat([...new Set(g.flatMap(x => x.kinds))].slice(0, 4)) });
       final.push(...g.filter(x => x.score >= 5)); // strong individual attackers stay visible next to their range
     } else final.push(...g);
@@ -3037,7 +3149,7 @@ $('#blockAllow').value = blockAllow;
 $('#blockDropped').onchange = e => { blockShowDropped = e.target.checked; if (D && D.n) renderBlock(); };
 $('#blockAllow').onchange = e => { blockAllow = e.target.value.trim(); try { localStorage.setItem(BLOCK_ALLOW_KEY, blockAllow); } catch {} if (D && D.n) renderBlock(); };
 // pick a sensible default script format from what's loaded
-function blockDefaultFmt() { const k = D.kinds; return k.opn ? 'opnalias' : k.ufw ? 'ufw' : k.win ? 'win' : D.waf ? 'modsec' : 'ufw'; }
+function blockDefaultFmt() { const k = D.kinds; if (D.waf && D.viaCf > D.wafRows / 2) return 'cloudflare'; return k.opn ? 'opnalias' : k.ufw ? 'ufw' : k.win ? 'win' : D.waf ? 'modsec' : 'ufw'; }
 function blockScripts(list, fmt) {
   const v4 = list.filter(x => !x.includes(':')), v6 = list.filter(x => x.includes(':'));
   const stamp = new Date().toISOString().slice(0, 10);
@@ -3077,6 +3189,17 @@ function blockScripts(list, fmt) {
       text: [...head('#'), `$addrs = @(${list.map(x => `'${x}'`).join(', ')})`, "Remove-NetFirewallRule -DisplayName 'fwscope block' -ErrorAction SilentlyContinue",
         "New-NetFirewallRule -DisplayName 'fwscope block' -Direction Inbound -Action Block -RemoteAddress $addrs -Profile Any | Out-Null", "Write-Host \"Blocked $($addrs.Count) entries\""].join('\r\n') + '\r\n',
       undo: ["# undo the fwscope block list", "Remove-NetFirewallRule -DisplayName 'fwscope block'"].join('\r\n') + '\r\n' };
+    case 'cloudflare': {
+      // IP Access Rules: single addresses as "ip", ranges as "ip_range" (Cloudflare takes IPv4 /16 or /24, IPv6 /32, /48 or /64)
+      const target = x => x.includes('/') ? 'ip_range' : 'ip';
+      return {
+        name: 'fwscope-block-cloudflare.sh', note: 'Blocks at Cloudflare\u2019s edge, which is the only place that stops visitors to a proxied site; a firewall rule on your server only ever sees Cloudflare. Needs an API token with Zone \u2192 Firewall Services \u2192 Edit for your zone, and the zone ID from the zone\u2019s Overview page. The undo script needs jq.',
+        text: ['#!/bin/sh', ...head('#'), ': "${CF_API_TOKEN:?set CF_API_TOKEN}" "${CF_ZONE_ID:?set CF_ZONE_ID}"',
+          ...list.map(x => `curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/firewall/access_rules/rules" -H "Authorization: Bearer $CF_API_TOKEN" -H 'Content-Type: application/json' -d '{"mode":"block","configuration":{"target":"${target(x)}","value":"${x}"},"notes":"fwscope ${stamp}"}'; echo`)].join('\n') + '\n',
+        undo: ['#!/bin/sh', '# undo: delete the access rules this script added (matched by their "fwscope <date>" note); needs jq', ': "${CF_API_TOKEN:?}" "${CF_ZONE_ID:?}"',
+          `curl -s "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/firewall/access_rules/rules?notes=fwscope%20${stamp}&per_page=1000" -H "Authorization: Bearer $CF_API_TOKEN" | jq -r '.result[].id' | while read -r id; do`,
+          '  curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/firewall/access_rules/rules/$id" -H "Authorization: Bearer $CF_API_TOKEN"; echo', 'done'].join('\n') + '\n' };
+    }
     case 'modsec': {
       const behindCf = D.viaCf > 0;
       return {
@@ -3092,8 +3215,89 @@ $('#btnBlock').onclick = () => {
   const list = BLOCK.filter(x => BLOCKSEL.has(x.key)).map(x => x.key);
   if (!list.length) { alert('Tick at least one row to block.'); return; }
   const fmt = $('#blockFmt').value, sc = blockScripts(list, fmt);
+  const viaCf = BLOCK.filter(x => BLOCKSEL.has(x.key) && x.cf).length;
+  if (viaCf && !['cloudflare', 'modsec'].includes(fmt)) sc.note = `${fmtN(viaCf)} of these reached your site through Cloudflare. A firewall rule on your server can't stop those: their connections come from Cloudflare's addresses, not theirs. Use the Cloudflare or ModSecurity format for them. ` + sc.note;
   const text = sc.text + (sc.undo ? '\n\n# ---------------- UNDO (save separately) ----------------\n' + sc.undo.split(/\r?\n/).map(l => l.startsWith('#') || !l ? l : '# ' + l).join('\n') : '');
   showOut(`Block script: ${$('#blockFmt').selectedOptions[0].textContent}`, sc.note + ' Review every entry first: blocking a shared address (a VPN exit, a carrier NAT, a cloud range) can shut out real people.', text, sc.name);
+};
+
+/* ============================================================ fail2ban drafts
+   Only jails the logs justify, each measured on the logs: replay every source's matching events through
+   fail2ban's rule (maxretry events within findtime) and count who would have been banned, and how many of
+   those look legitimate (wafContext's test). */
+function f2bReplay(bySrc, maxretry, findtime) {
+  let banned = 0; const who = [];
+  for (const [src, ts] of bySrc) {
+    ts.sort((a, b) => a - b);
+    for (let k = maxretry - 1; k < ts.length; k++) if (ts[k] - ts[k - maxretry + 1] <= findtime) { banned++; who.push(src); break; }
+  }
+  return { banned, who };
+}
+function draftFail2ban() {
+  const c = D.c, G = D.actGroup, out = [], summary = [];
+  const cf = D.viaCf > 0, apache = D.wafFmt && D.wafFmt.has('apache'), nginx = D.wafFmt && (D.wafFmt.has('nginx') || D.wafFmt.has('v3'));
+  const ban = cf
+    ? 'action = cloudflare-token[cfzone="YOUR_ZONE_ID", cftoken="YOUR_API_TOKEN"]   ; your site is behind Cloudflare: a local firewall ban would not stop proxied requests (fail2ban 1.0+ ships action.d/cloudflare-token.conf)'
+    : null;
+  const file = (path, lines) => { out.push(`# ===== ${path} =====`, ...lines, ''); };
+  const jail = [];
+  // 1) ModSecurity: requests over the anomaly threshold (rule 949110 fires whether or not the engine blocks)
+  if (D.waf) {
+    const { c: cc, rows, T, why } = wafContext();
+    const bySrc = new Map(); let legitSrc = new Set();
+    for (const i of rows) if (cc.score[i] >= T) { let a = bySrc.get(cc.src[i]); if (!a) bySrc.set(cc.src[i], a = []); a.push(cc.ts[i]); }
+    const r = f2bReplay(bySrc, 3, 600e3);
+    // for a ban, only verified crawlers and your own addresses count as legitimate (a protocol-policy hit from a
+    // bare-IP scanner is still a scanner)
+    const firstRow = new Map(); for (const i of rows) if (!firstRow.has(cc.src[i])) firstRow.set(cc.src[i], i);
+    for (const src of r.who) { const w = why(firstRow.get(src)); if (w === 'own' || w === 'crawler') legitSrc.add(src); }
+    summary.push(`ModSecurity: maxretry 3 in 10 minutes would have banned ${fmtN(r.banned)} of ${fmtN(bySrc.size)} sources that went over the threshold (${T})${legitSrc.size ? `, ${fmtN(legitSrc.size)} of them verified crawlers or your own addresses (add those to ignoreip)` : ', none of them verified crawlers or your own addresses'}.`);
+    file('/etc/fail2ban/filter.d/fwscope-modsecurity.conf', [
+      '# Requests whose inbound anomaly score reached the threshold (CRS rule 949110). Matches in detection-only mode too.',
+      ...(apache ? ['[INCLUDES]', 'before = apache-common.conf', '', '[Definition]',
+        'failregex = ^%(_apache_error_client)s(?: \\[client [^\\]]+\\])? ModSecurity: (?:Warning|Access denied)\\..*\\[id "949110"\\]']
+        : ['[Definition]', 'failregex = \\[client <HOST>\\] ModSecurity: (?:Warning|Access denied)\\..*\\[id "949110"\\]']),
+      'ignoreregex =']);
+    jail.push('[fwscope-modsecurity]', 'enabled  = true', 'port     = http,https', 'filter   = fwscope-modsecurity',
+      `logpath  = ${apache ? '/var/log/apache2/error.log' : '/var/log/nginx/error.log'}`, 'maxretry = 3', 'findtime = 10m', 'bantime  = 1h', ...(ban ? [ban] : []), '');
+    if (cf) summary.push('Behind Cloudflare: the error log must show the visitor’s address (Apache mod_remoteip / nginx real_ip with Cloudflare’s ranges), or every ban hits Cloudflare itself.');
+  }
+  // 2) WordPress logins hammered (POSTs to wp-login.php / xmlrpc.php that reached the app)
+  if (D.waf) {
+    const bySrc = new Map();
+    for (const i of SEL) if (D.actWaf[c.act[i]] && D.method.list[c.method[i]] === 'POST' && /\/(wp-login\.php|xmlrpc\.php)$/.test(D.path.list[c.path[i]] || '')) { let a = bySrc.get(c.src[i]); if (!a) bySrc.set(c.src[i], a = []); a.push(c.ts[i]); }
+    if (bySrc.size) {
+      const r = f2bReplay(bySrc, 5, 300e3);
+      summary.push(`WordPress logins: maxretry 5 in 5 minutes would have banned ${fmtN(r.banned)} of ${fmtN(bySrc.size)} sources posting to wp-login.php / xmlrpc.php.`);
+      file('/etc/fail2ban/filter.d/fwscope-wordpress.conf', ['# POSTs to the WordPress login and XML-RPC endpoints, from the web server’s access log', '[Definition]',
+        'failregex = ^<HOST> \\S+ \\S+ \\[[^\\]]+\\] "POST /(?:wp-login\\.php|xmlrpc\\.php)', 'ignoreregex =']);
+      jail.push('[fwscope-wordpress]', 'enabled  = true', 'port     = http,https', 'filter   = fwscope-wordpress',
+        `logpath  = ${apache || !nginx ? '/var/log/apache2/access.log' : '/var/log/nginx/access.log'}`, 'maxretry = 5', 'findtime = 5m', 'bantime  = 1d', ...(ban ? [ban] : []), '');
+    }
+  }
+  // 3) SSH: only worth a jail if hammering got through to sshd (allowed / passed connections on 22)
+  {
+    const bySrc = new Map(); let dropped = 0;
+    for (const i of SEL) {
+      if (c.dpt[i] !== 22 || (D.ipc[c.src[i]] & 7) || (D.waf && D.actWaf[c.act[i]])) continue;
+      if (G[c.act[i]] === 2 && !c.iout[i]) { let a = bySrc.get(c.src[i]); if (!a) bySrc.set(c.src[i], a = []); a.push(c.ts[i]); } else if (G[c.act[i]] <= 1) dropped++;
+    }
+    if (bySrc.size) {
+      const r = f2bReplay(bySrc, 5, 600e3);
+      summary.push(`SSH: maxretry 5 in 10 minutes would have banned ${fmtN(r.banned)} of ${fmtN(bySrc.size)} sources whose connections to port 22 were let through.`);
+      jail.push('[sshd]', 'enabled  = true', 'maxretry = 5', 'findtime = 10m', 'bantime  = 1h', '');
+    } else if (dropped) summary.push(`SSH: ${fmtN(dropped)} connections to port 22 were all dropped or rate-limited by the firewall already, so no sshd jail is drafted.`);
+  }
+  if (!jail.length) return null;
+  // 4) repeat offenders get a long ban
+  jail.push('[recidive]', 'enabled  = true', 'bantime  = 1w', 'findtime = 1d', 'maxretry = 3', ...(ban ? [ban] : []), '');
+  file('/etc/fail2ban/jail.d/fwscope.local', ['# fwscope: drafted jails. Review, then: sudo fail2ban-client reload', '[DEFAULT]', 'ignoreip = 127.0.0.1/8 ::1   ; add your own addresses and monitoring here', '', ...jail]);
+  return { text: ['# fwscope fail2ban drafts, ' + new Date().toISOString().slice(0, 10) + '. Each block below is one file.', ...summary.map(x => '# ' + x), '', ...out].join('\n'), summary };
+}
+$('#btnF2b').onclick = () => {
+  const d = draftFail2ban();
+  if (!d) { alert('Nothing in this filter calls for a fail2ban jail: no WAF requests over the threshold, no WordPress login attempts, and no SSH connections that got through.'); return; }
+  showOut('Drafted fail2ban jails', d.summary.join(' ') + ' Test a filter before enabling it: fail2ban-regex /var/log/apache2/error.log /etc/fail2ban/filter.d/fwscope-modsecurity.conf', d.text, 'fwscope-fail2ban.txt');
 };
 
 /* ============================================================ saved report
@@ -3244,6 +3448,14 @@ function makeSample() {
   // a WordPress login brute force: same path over and over
   { const t0 = startT + 4.2 * 864e5; for (let k = 0; k < 90; k++) add(t0 + k * ri(20, 60) * 1000, { waf: true, src: '198.51.100.23', site: 'blog.example.com', method: 'POST', uri: '/wp-login.php', ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', rules: [['9500001', 'Custom: repeated login attempts', 3, 'attack-generic']], status: k % 10 < 6 ? 403 : 200 }); }
 
+  // 14) the same desktop's Security log (5156/5157/5152, exported as JSON lines): which program made each connection
+  for (let t = startT; t < end; t += ri(900, 4800) * 1000) {
+    const r = rnd(), out = r < 0.75;
+    const app = out ? pick(['C:\\Program Files\\Mozilla Firefox\\firefox.exe', 'C:\\Windows\\System32\\svchost.exe', 'C:\\Users\\pat\\AppData\\Local\\Discord\\app-1.0.9\\Discord.exe', 'C:\\Program Files\\Steam\\steam.exe', 'C:\\Windows\\System32\\OneDriveSetup.exe'])
+      : pick(['System', 'C:\\Windows\\System32\\svchost.exe', 'C:\\Program Files\\Steam\\steam.exe']);
+    add(t, { wsec: true, id: out ? 5156 : pick([5157, 5152, 5156]), out, app, local: '192.168.1.60', lport: out ? ri(49152, 65535) : pick([445, 139, 135, 27036, 3389]), remote: out ? pub() : '192.168.1.' + ri(2, 250), rport: out ? pick([443, 443, 80, 53, 27015]) : ri(49152, 65535), proto: out && rnd() < 0.15 ? 17 : 6 });
+  }
+
   // 11) a Windows desktop on the LAN with pfirewall.log logging (dropped inbound, some allowed outbound)
   const WIN = '192.168.1.60';
   for (let t = startT; t < end; t += ri(60, 600) * 1000) {
@@ -3262,6 +3474,9 @@ function makeSample() {
     '#Fields: date time action protocol src-ip dst-ip src-port dst-port size tcpflags tcpsyn tcpack tcpwin icmptype icmpcode info path pid\n' + ev.map(e => {
     const d = new Date(e.t + ri(0, 999));
     const w = wall(d);
+    if (e.wsec) return JSON.stringify({ EventID: e.id, TimeCreated: d.toISOString(), Computer: 'DESKTOP-LAN60', ProcessID: String(ri(400, 20000)),
+      Application: e.app === 'System' ? 'System' : e.app.replace(/^C:\\/, '\\device\\harddiskvolume3\\'), Direction: e.out ? '%%14593' : '%%14592',
+      SourceAddress: e.local, SourcePort: String(e.lport), DestAddress: e.remote, DestPort: String(e.rport), Protocol: String(e.proto), FilterRTID: String(ri(60000, 90000)), LayerName: e.out ? '%%14611' : '%%14610' });
     if (e.waf) {
       const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(Date.UTC(w.y, w.mo, w.d)).getUTCDay()];
       return JSON.stringify({ transaction: { client_ip: e.src, time_stamp: `${DAY} ${MONS[w.mo]} ${String(w.d).padStart(2, ' ')} ${pad(w.h)}:${pad(w.mi)}:${pad(w.s)} ${w.y}`, server_id: 'sample', client_port: ri(30000, 65000),

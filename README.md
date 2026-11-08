@@ -81,12 +81,30 @@ How it maps onto the dashboard:
 - No rule name or TTL is logged. Times have no timezone: they're read in the zone set under **Logs without a timezone are in**, which defaults to your browser's own (see Notes).
 - The parser follows the `#Fields:` header, so the extra process-ID column on newer Windows builds is fine.
 
+### Program names (Security log)
+
+`pfirewall.log` doesn't say which program a connection belonged to, but Windows' Security log does, once *Filtering Platform Connection* auditing is turned on: event **5156** (connection allowed), **5157** (connection blocked) and **5152** (packet dropped). In an admin PowerShell:
+
+```powershell
+auditpol /set /subcategory:"Filtering Platform Connection" /success:enable /failure:enable
+Get-WinEvent -FilterHashtable @{LogName='Security';Id=5152,5156,5157} -MaxEvents 200000 | % { $x=[xml]$_.ToXml(); $d=[ordered]@{EventID=$_.Id;TimeCreated=$_.TimeCreated.ToUniversalTime().ToString('o');Computer=$_.MachineName}; $x.Event.EventData.Data | % { $d[$_.Name]=$_.'#text' }; $d | ConvertTo-Json -Compress } | Set-Content -Encoding utf8 "$HOME\Desktop\$env:COMPUTERNAME-wfp.json"
+```
+
+Allowed connections are very frequent, so the Security log fills up fast. Leave auditing on only while you need it (`/success:disable` turns that half off).
+
+Drop the `.json` file on the page:
+
+- **Program names:** every event gets the program that made or received the connection (`firefox.exe`, `svchost.exe`, `System`), and the computer name becomes **Host**.
+- **New views:** a **Programs** Top list, a **Program** table column and an `app:` filter (`app:steam`, `app:svc*`).
+- **Direction:** Windows records the local side as "source" either way, so inbound events are flipped to show the remote address as the source, like the other logs.
+
 ## What you get
 
 - **Stat tiles**: events by action, unique sources, destination ports, busiest source, time span
 - **Events over time**: stacked by action (BLOCK / LIMIT / ALLOW / AUDIT). Drag to zoom into a range, double-click to reset. With firewall and WAF logs both loaded, it splits into two charts on the same time axis, firewall above and WAF below, each with its own scale so the smaller one isn't flattened. **Split firewall / WAF** turns that off.
 - **Two "Top" lists**, each switchable: sources, source subnets (/24 and /64), destinations, destination and source ports (with service names), protocols, in/out interfaces, ICMP types, source MACs, logging hosts, exact action tags
 - **New in the last hour / 24 hours / 7 days**: sources, networks, countries and destination ports first seen in that window and never earlier in the loaded logs. The window ends at the newest event loaded. It follows the current filter but always looks back through all loaded history, so `dpt:22` gives you new SSH sources. It warns you when too little history is loaded to tell what's actually new. Busy routers turn up lots of "new" high ports from ordinary traffic; `act:block` narrows it to what was blocked.
+- **Compare the last hour / day / week with the one before**: grouped by any Top-list dimension (sources, networks, attack types, rules, ports, programs …), sorted by the size of the change, with new and gone entries marked. It follows the current filter, apart from its time range. Handy after blocking something, to see whether it worked.
 - **Weekday × hour heatmap**
 - **Scans and hammering**: blocked sources that swept many ports or kept hitting one, each with a pattern label:
   - **fast sweep**: 50+ ports within an hour
@@ -239,6 +257,17 @@ Traffic your firewall already drops isn't a reason to block anything, so firewal
 | Windows Firewall | One inbound Block rule, `fwscope block`, via `New-NetFirewallRule` | `Remove-NetFirewallRule -DisplayName 'fwscope block'` |
 | ModSecurity | One `@ipMatch … deny` rule. Behind Cloudflare it checks `CF-Connecting-IP`, since `REMOTE_ADDR` would be Cloudflare | Remove rule 1000200 |
 
+**Behind Cloudflare.** A firewall rule on your server can't stop a visitor whose requests come through Cloudflare: those connections arrive from Cloudflare's addresses. Sources whose requests came through Cloudflare are marked **via Cloudflare**. The firewall scripts warn when they include any. The **Cloudflare (IP access rules)** format blocks them at Cloudflare's edge through its API instead: set `CF_API_TOKEN` (Zone → Firewall Services → Edit) and `CF_ZONE_ID`, and the undo script (needs `jq`) deletes the rules it added. The ModSecurity format works too, since it checks `CF-Connecting-IP`. The default format is Cloudflare when most WAF requests came through it.
+
+**Draft fail2ban** writes fail2ban jails for the patterns in your logs, so bans happen on their own from then on. It only drafts the ones your logs call for, and measures each on them, replaying every source's events through the jail's rule (maxretry within findtime):
+
+- **ModSecurity:** bans on rule 949110 (the request's anomaly score reached the threshold). That works in detection-only mode too. It uses an Apache or nginx error-log filter, whichever your logs came from. On these logs: "would have banned 172 of 949 sources over the threshold, 4 of them verified crawlers or your own addresses".
+- **WordPress:** POSTs to `wp-login.php` / `xmlrpc.php` in the access log, if any were seen.
+- **SSH:** the stock `sshd` jail, only if connections to port 22 got through. If they were all dropped or rate-limited already, it says so instead.
+- **recidive:** a week's ban for repeat offenders.
+
+Behind Cloudflare the jails use fail2ban's `cloudflare-token` action, since a local ban wouldn't stop proxied requests, and note that your error log has to show the visitor's real address.
+
 Every script starts with the date and the number of entries, and has its undo script at the bottom, commented out. Review the list first: blocking a shared address (a VPN exit, a carrier NAT, a cloud range) can shut out real people.
 
 ## Hostnames (reverse DNS)
@@ -271,6 +300,7 @@ The filter box takes space-separated terms. All of them must match.
 | `ua:` | `ua:*sqlmap*` (spaces in a user agent are written as `_`) |
 | `score:` | `score:10-1000`: requests with an inbound anomaly score of 10 or more (WAF) |
 | `rdns:` | `rdns:googlebot.com` (hostname ends with), `rdns:*.amazonaws.com`, `rdns:confirmed`, `rdns:unconfirmed`, `rdns:none` (looked up, no name). Only sources that have been looked up can match; see [Hostnames](#hostnames-reverse-dns) |
+| `app:` | `app:firefox.exe`, `app:steam`, `app:svc*` (Windows Security log) |
 | `seen:` | `seen:both`: addresses in both the firewall and the WAF logs (`seen:waf`, `seen:fw`) |
 | `act:` | `act:block`, `act:limit_block`, `act:audit_invalid` |
 | `flag:` | `flag:syn`, `flag:rst` (SYN ACK FIN RST PSH URG ECE CWR DF) |
